@@ -1,0 +1,228 @@
+import casadi
+import pybamm
+import numpy as np
+import liionpack as lp
+
+
+def _serial_eval(model, solutions, inputs_dict, variables, t_eval):
+    """
+    Internal function to evaluate the model variables in a serial way.
+
+    Args:
+        model (pybamm.Model):
+            The built model
+        solutions (iter of pybamm.Solution):
+            Used to get the last state of the system and use as x0 and z0 for the
+            casadi integrator. Provide solution objects for each battery.
+        inputs_dict (iter of input_dicts):
+            Provide inputs_dict objects for each battery.
+        variables (variables evaluator):
+            Produced by _create_casadi_objects when mapped = False
+        t_eval (np.ndarray):
+            A float array of times to evaluate.
+            Produced by _create_casadi_objects when mapped = False
+
+    Returns:
+        sol (list):
+            solutions that have been stepped forward by one timestep
+        var_eval (list):
+            evaluated variables for final state of system
+
+    """
+    len_rhs = model.concatenated_rhs.size
+    N = len(solutions)
+    t_min = 0.0
+    var_eval = []
+    for k in range(N):
+        if solutions[k] is None:
+            # First pass
+            xend = model.y0[:len_rhs]
+        else:
+            xend = solutions[k].y[:, -1]
+
+        temp = inputs_dict[k]
+        inputs = casadi.vertcat(*[x for x in temp.values()] + [t_min])
+        ninputs = len(temp.values())
+        var_eval.append(variables(0, xend[:len_rhs], xend[len_rhs:], inputs[0:ninputs]))
+
+    return casadi.horzcat(*var_eval)
+
+
+def _serial_step(model, solutions, inputs_dict, integrator, variables, t_eval, events):
+    """
+    Internal function to process the model for one timestep in a serial way.
+
+    Args:
+        model (pybamm.Model):
+            The built model
+        solutions (iter of pybamm.Solution):
+            Used to get the last state of the system and use as x0 and z0 for the
+            casadi integrator. Provide solution objects for each battery.
+        inputs_dict (iter of input_dicts):
+            Provide inputs_dict objects for each battery.
+        integrator (casadi.integrator):
+            Produced by _create_casadi_objects when mapped = False
+        variables (variables evaluator):
+            Produced by _create_casadi_objects when mapped = False
+        t_eval (np.ndarray):
+            A float array of times to evaluate.
+            Produced by _create_casadi_objects when mapped = False
+        events (mapped events evaluator):
+            Produced by `_create_casadi_objects`
+
+    Returns:
+        sol (list):
+            solutions that have been stepped forward by one timestep
+        var_eval (list):
+            evaluated variables for final state of system
+
+    """
+    len_rhs = model.concatenated_rhs.size
+    N = len(solutions)
+    t_min = 0.0
+    timer = pybamm.Timer()
+    sol = []
+    var_eval = []
+    events_eval = []
+    for k in range(N):
+        if solutions[k] is None:
+            # First pass
+            x0 = model.y0[:len_rhs]
+            z0 = model.y0[len_rhs:]
+        else:
+            x0 = solutions[k].y[:len_rhs, -1]
+            z0 = solutions[k].y[len_rhs:, -1]
+        temp = inputs_dict[k]
+        inputs = casadi.vertcat(*[x for x in temp.values()] + [t_min])
+        ninputs = len(temp.values())
+        # Call the integrator once, with the grid
+        casadi_sol = integrator(x0=x0, z0=z0, p=inputs)
+        xf = casadi.horzcat(x0, casadi_sol["xf"])
+        zf = casadi_sol["zf"]
+        if zf.is_empty():
+            y_sol = xf
+        else:
+            y_sol = casadi.vertcat(xf, zf)
+        xend = y_sol[:, -1]
+        sol.append(pybamm.Solution(t_eval, y_sol, model, inputs_dict[k]))
+        var_eval.append(variables(0, xend[:len_rhs], xend[len_rhs:], inputs[0:ninputs]))
+        if events is not None:
+            events_eval.append(
+                events(0, xend[:len_rhs], xend[len_rhs:], inputs[0:ninputs])
+            )
+        integration_time = timer.time()
+        sol[-1].integration_time = integration_time
+
+    return sol, casadi.horzcat(*var_eval), casadi.horzcat(*events_eval)
+
+
+def _create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
+    """
+    Internal function to produce the casadi objects in their mapped form for
+    parallel evaluation
+
+    Args:
+        inputs (dict):
+            initial guess for inputs (not used for simulation).
+        sim (pybamm.Simulation):
+            A PyBaMM simulation object that contains the model, parameter values,
+            solver, solution etc.
+        dt (float):
+            The time interval (in seconds) for a single timestep. Fixed throughout
+            the simulation
+        Nspm (int):
+            Number of individual batteries in the pack.
+        variable_names (list):
+            Variables to evaluate during solve. Must be a valid key in the
+            model.variables
+
+    Returns:
+        integrator (mapped casadi.integrator):
+            Solves an initial value problem (IVP) coupled to a terminal value
+            problem with differential equation given as an implicit ODE coupled
+            to an algebraic equation and a set of quadratures
+        variables_fn (mapped variables evaluator):
+            evaluates the simulation and output variables. see casadi function
+        t_eval (np.ndarray):
+            Float array of times to evaluate.
+            times to evaluate in a single step, starting at zero for each step
+        events_fn (mapped events evaluator):
+            evaluates the event variables. see casadi function
+
+    """
+    solver = sim.solver
+    # Initial solution - this builds the model behind the scenes
+    sim.build()
+    initial_solutions = []
+    init_sol = sim.step(
+        dt=1e-6, save=False, starting_solution=None, inputs=inputs[0]
+    ).last_state
+    # evaluate initial condition
+    model = sim.built_model
+    y0_total_size = (
+        model.len_rhs + model.len_rhs_sens + model.len_alg + model.len_alg_sens
+    )
+    y_zero = np.zeros((y0_total_size, 1))
+    for inpt in inputs:
+        inputs_casadi = casadi.vertcat(*[x for x in inpt.values()])
+        initial_solutions.append(init_sol.copy())
+        _init = model.initial_conditions_eval(0, y_zero, inputs_casadi)
+        initial_solutions[-1].y[:] = _init
+
+    # Step model forward dt seconds
+    t_eval = np.linspace(0, dt, 11)
+
+    # No external variables - Temperature solved as lumped model in pybamm
+    # External variables could (and should) be used if battery thermal problem
+    # Includes conduction with any other circuits or neighboring batteries
+    # inp_and_ext.update(external_variables)
+    inp_and_ext = inputs
+
+    # Code to create mapped integrator
+    integrator = solver.create_integrator(
+        sim.built_model, inputs=inp_and_ext, t_eval=t_eval
+    )
+    # Get the input parameter order
+    ip_order = inputs[0].keys()
+    # Variables function for parallel evaluation
+    casadi_objs = sim.built_model.export_casadi_objects(
+        variable_names=variable_names, input_parameter_order=ip_order
+    )
+    variables = casadi_objs["variables"]
+    t, x, z, p = (
+        casadi_objs["t"],
+        casadi_objs["x"],
+        casadi_objs["z"],
+        casadi_objs["inputs"],
+    )
+    variables_stacked = casadi.vertcat(*variables.values())
+    variables_fn = casadi.Function("variables", [t, x, z, p], [variables_stacked])
+    # Look for events in model variables and create a function to evaluate them
+    all_vars = sorted(sim.model.variables.keys())
+    event_vars = [v for v in all_vars if "Event" in v]
+    if len(event_vars) > 0:
+        # Variables function for parallel evaluation
+        casadi_objs = sim.built_model.export_casadi_objects(
+            variable_names=variable_names, input_parameter_order=ip_order
+        )
+        events = casadi_objs["variables"]
+        t, x, z, p = (
+            casadi_objs["t"],
+            casadi_objs["x"],
+            casadi_objs["z"],
+            casadi_objs["inputs"],
+        )
+        events_stacked = casadi.vertcat(*events.values())
+        events_fn = casadi.Function("variables", [t, x, z, p], [events_stacked])
+    else:
+        events_fn = None
+
+    output = {
+        "integrator": integrator,
+        "variables_fn": variables_fn,
+        "t_eval": t_eval,
+        "event_names": event_vars,
+        "events_fn": events_fn,
+        "initial_solutions": initial_solutions,
+    }
+    return output

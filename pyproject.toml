@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "liionpack"
+version = "0"
+description = "A battery pack simulator for PyBaMM"
+authors = ["Tom Tranter <t.g.tranter@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.12"
+ipython = "*"
+lcapy = "*"
+matplotlib = "*"
+networkx = "*"
+numpy = "*"
+openpyxl = "*"
+pandas = "*"
+plotly = "*"
+pybamm = { version = "==23.9", allow-prereleases = false }
+redis = "*"
+scikit-spatial = "*"
+scipy = "*"
+textwrapper = "*"
+tqdm = "*"
+nbconvert = "*"
