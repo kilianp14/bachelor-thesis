@@ -1,7 +1,6 @@
 import casadi
 import pybamm
 import numpy as np
-import liionpack as lp
 
 
 def _serial_eval(model, solutions, inputs_dict, variables, t_eval):

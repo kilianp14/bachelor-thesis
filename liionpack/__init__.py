@@ -23,7 +23,6 @@ from .netlist_utils import power_loss
 from .netlist_utils import write_netlist
 from .sim_utils import get_initial_stoichiometries
 from .sim_utils import update_init_conc
-from .solver_utils import solve
 from .plots import draw_circuit
 from .plots import plot_pack
 from .plots import plot_cells

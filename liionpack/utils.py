@@ -45,7 +45,7 @@ def _convert_dict_to_list_of_dict(inputs_dict):
     return dicts
 
 
-def build_inputs_dict(I_batt, inputs, updated_inputs):
+def build_inputs_dict(I_batt, inputs):
     """
     Function to convert inputs and external_variable arrays to list of dicts
     As expected by the casadi solver. These are then converted back for mapped
@@ -58,9 +58,6 @@ def build_inputs_dict(I_batt, inputs, updated_inputs):
         inputs (dict):
             A dictionary with key of each input and value an array of input
             values for each battery.
-        updated_inputs (dict):
-            A dictionary with key of each updated input and value an array
-            of variable values for each battery.
 
     Returns:
         inputs_dict (list):
@@ -74,8 +71,6 @@ def build_inputs_dict(I_batt, inputs, updated_inputs):
     inputs_dict.update(current_dict)
     if inputs is not None:
         inputs_dict.update(inputs)
-    if updated_inputs is not None:
-        inputs_dict.update(updated_inputs)
     inputs_dict = _convert_dict_to_list_of_dict(inputs_dict)
     return inputs_dict
 
