@@ -1,14 +1,7 @@
-#
-# Postprocessing plot functions
-#
-
-import liionpack as lp
 import numpy as np
 import matplotlib.pyplot as plt
-from sympy import init_printing
-import textwrap
 
-init_printing(pretty_print=False)
+from netlist_utils import make_lcapy_circuit
 
 
 def lp_cmap(color="dark"):
@@ -121,13 +114,8 @@ def draw_circuit(
             'pins' to label nodes that are pins on a chip, 'all' to label all nodes
         style (string):
             'american', 'british', or 'european'
-
-    Example:
-        >>> import liionpack as lp
-        >>> net = lp.setup_circuit(Np=3, Ns=1, Rb=1e-4, Rc=1e-2, Ri=5e-2, V=3.2, I=80.0)
-        >>> lp.draw_circuit(net)
     """
-    cct = lp.make_lcapy_circuit(netlist)
+    cct = make_lcapy_circuit(netlist)
     kwargs = {
         "cpt_size": cpt_size,
         "dpi": dpi,
@@ -142,94 +130,6 @@ def draw_circuit(
         "style": style,
     }
     cct.draw(**kwargs)
-
-
-def plot_pack(output, color="dark"):
-    """
-    Plot the battery pack voltage and current.
-
-    Args:
-        output (dict):
-            Output from liionpack.solve which contains pack and cell variables.
-        color (string):
-            The color-scheme for plotting, default="dark"
-    """
-
-    # Get pack level results
-    time = output["Time [s]"]
-    v_pack = output["Pack terminal voltage [V]"]
-    i_pack = output["Pack current [A]"]
-
-    context = lp_context(color)
-    cmap = lp_cmap(context)
-
-    colors = cmap(np.linspace(0, 1, 2))
-    with plt.rc_context(context):
-        # Plot pack voltage and current
-        _, ax = plt.subplots(tight_layout=True)
-        ax.plot(time, v_pack, color=colors[0], label="simulation")
-        ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Pack terminal voltage [V]", color=colors[0])
-        ax.grid(False)
-        ax2 = ax.twinx()
-        ax2.plot(time, i_pack, color=colors[1], label="simulation")
-        ax2.set_ylabel("Pack current [A]", color=colors[1])
-        ax2.set_title("Pack Summary")
-
-
-def plot_cells(output, color="dark"):
-    """
-    Plot results for the battery cells.
-
-    Args:
-        output (dict):
-            Output from liionpack.solve which contains pack and cell variables.
-        color (string):
-            The color-scheme for plotting, default="dark"
-    """
-
-    # Get time and results for battery cells
-    time = output["Time [s]"]
-    cell_vars = [k for k in output.keys() if len(output[k].shape) > 1]
-
-    context = lp_context(color)
-    cmap = lp_cmap(context)
-
-    # Get number of cells and setup colormap
-    n = output[cell_vars[0]].shape[-1]
-    colors = cmap(np.linspace(0, 1, n))
-
-    # Create plot figures for cell variables
-    with plt.rc_context(context):
-        for var in cell_vars:
-            _, ax = plt.subplots(tight_layout=True)
-            for i in range(n):
-                ax.plot(time, output[var][:, i], color=colors[i])
-            ax.set_xlabel("Time [s]")
-            ax.set_ylabel(textwrap.fill(var, 45))
-            ax.ticklabel_format(axis="y", scilimits=[-5, 5])
-
-
-def plot_output(output, color="dark"):
-    """
-    Plot all results for pack and cells
-
-    Args:
-        output (dict):
-            Output from liionpack.solve which contains pack and cell variables.
-        color (string):
-            The color-scheme for plotting, default="dark"
-
-    """
-    plot_pack(output, color)
-    plot_cells(output, color)
-
-
-def show_plots():  # pragma: no cover
-    """
-    Wrapper function for the Matplotlib show() function.
-    """
-    plt.show()
 
 
 def simple_netlist_plot(netlist):

@@ -1,9 +1,8 @@
-import liionpack as lp
-from liionpack.solver_utils import _create_casadi_objects as cco
-from liionpack.solver_utils import _serial_step as ss
-from liionpack.solver_utils import _serial_eval as se
 import numpy as np
 import pybamm
+
+from solver_utils import create_casadi_objects, serial_step, serial_eval, setup_basic_simulation, build_inputs_dict
+from netlist_utils import solve_circuit_vectorized, power_loss
 
 
 class Actor:
@@ -20,14 +19,12 @@ class Actor:
         initial_soc,
     ):
         self.Nspm = Nspm
+
         # Set up simulation
-        self.parameter_values = parameter_values
-        if initial_soc is not None:
-            _, _ = lp.update_init_conc(parameter_values, initial_soc, update=True)
-        self.simulation = lp.basic_simulation(self.parameter_values)
+        self.simulation = setup_basic_simulation(parameter_values, initial_soc)
 
         # Set up integrator
-        casadi_objs = cco(inputs, self.simulation, dt, Nspm, variable_names)
+        casadi_objs = create_casadi_objects(inputs, self.simulation, dt, Nspm, variable_names)
         self.model = self.simulation.built_model
         self.integrator = casadi_objs["integrator"]
         self.variables_fn = casadi_objs["variables_fn"]
@@ -37,12 +34,10 @@ class Actor:
         self.step_solutions = casadi_objs["initial_solutions"]
         self.last_events = None
         self.event_change = None
-        self.step_fn = ss
-        self.eval_fn = se
 
     def step(self, inputs):
         # Solver Step
-        self.step_solutions, self.var_eval, self.events_eval = self.step_fn(
+        self.step_solutions, self.var_eval, self.events_eval = serial_step(
             self.simulation.built_model,
             self.step_solutions,
             inputs,
@@ -54,12 +49,11 @@ class Actor:
         return self.check_events()
 
     def evaluate(self, inputs):
-        self.var_eval = self.eval_fn(
+        self.var_eval = serial_eval(
             self.simulation.built_model,
             self.step_solutions,
             inputs,
             self.variables_fn,
-            self.t_eval,
         )
 
     def check_events(self):
@@ -130,7 +124,7 @@ class Manager:
         # for init.
         netlist.loc[self.I_map, ("value")] = 1e-3
         # Solve the circuit to initialise the electrochemical models
-        _, I_batt = lp.solve_circuit_vectorized(netlist)
+        _, I_batt = solve_circuit_vectorized(netlist)
 
         # The simulation output variables calculated at each step for each battery
         # Must be a 0D variable i.e. battery wide volume average - or X-averaged for
@@ -163,7 +157,7 @@ class Manager:
 
         # Handle the inputs
         self.inputs = inputs
-        self.inputs_dict = lp.build_inputs_dict(self.shm_i_app[0, :], self.inputs)
+        self.inputs_dict = build_inputs_dict(self.shm_i_app[0, :], self.inputs)
         
         self.actor = Actor()
         self.actor.setup(
@@ -216,10 +210,10 @@ class Manager:
         self.netlist.loc[self.V_map, ("value")] = temp_ocv
         self.netlist.loc[self.Ri_map, ("value")] = self.temp_Ri
         self.netlist.loc[self.I_map, ("value")] = current
-        lp.power_loss(self.netlist)
+        power_loss(self.netlist)
         # 05 Solve the circuit with updated netlist
         if self.step <= self.Nsteps:
-            V_node, I_batt = lp.solve_circuit_vectorized(self.netlist)
+            V_node, I_batt = solve_circuit_vectorized(self.netlist)
             self.record_times[self.step] = self.step * self.step_size
             self.V_terminal[self.step] = V_node[self.Terminal_Node][0]
         if self.step < self.Nsteps - 1:
@@ -228,7 +222,7 @@ class Manager:
             I_app = I_batt[:] * -1
             self.shm_i_app[self.step, :] = I_app
             self.shm_i_app[self.step + 1, :] = I_app
-            self.inputs_dict = lp.build_inputs_dict(I_app, self.inputs)
+            self.inputs_dict = build_inputs_dict(I_app, self.inputs)
         # 06 Check if voltage limits are reached and terminate
         if np.any(temp_v < self.v_cut_lower):
             raise RuntimeError("Low voltage limit reached")
@@ -255,9 +249,6 @@ class Manager:
         i_func = self.parameter_values["Current function [A]"]
         if i_func.__class__ is not pybamm.InputParameter:
             self.parameter_values.update({"Current function [A]": "[input]"})
-            lp.logger.notice(
-                "Parameter: Current function [A] has been set to " + "input"
-            )
 
     def actor_htc(self, index):
         return self.htc[index]
@@ -277,7 +268,7 @@ class Manager:
         event_names = self.actor.get_event_names()
         for r in range(Nr):
             if np.any(event_change[r, :]):
-                lp.logger.warning(
+                print(
                     event_names[r]
                     + ", Batteries: "
                     + str(np.where(event_change[r, :])[0].tolist())

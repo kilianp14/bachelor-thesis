@@ -1,106 +1,7 @@
-#
-# Utility functions for loading and creating and solving circuits defined by
-# netlists
-#
-
-
 import numpy as np
-import codecs
 import pandas as pd
-import liionpack as lp
-import os
-import pybamm
 import scipy as sp
 from lcapy import Circuit
-
-
-def read_netlist(
-    filepath,
-    Ri=None,
-    Rc=None,
-    Rb=None,
-    Rt=None,
-    I=None,
-    V=None,
-):
-    """
-    Assumes netlist has been saved by LTSpice with format Descriptor Node1 Node2 Value
-    Any lines starting with * are comments and . are commands so ignore them
-    Nodes begin with N so remove that
-    Open ended components are not allowed and their nodes start with NC (no-connection)
-
-    Args:
-        filepath (str): Path to netlist circuit file '.cir' or '.txt'.
-        Ri (float): Internal resistance ($\Omega$).
-        Rc (float): Connection resistance ($\Omega$).
-        Rb (float): Busbar resistance ($\Omega$).
-        Rt (float): Terminal connection resistance ($\Omega$).
-        I (float): Current (A).
-        V (float): Initial battery voltage (V).
-
-    Returns:
-        netlist (pandas.DataFrame):
-            A netlist of circuit elements with format desc, node1, node2, value.
-    """
-
-    # Read in the netlist
-    if "." not in filepath:
-        filepath += ".cir"
-    if not os.path.isfile(filepath):
-        temp = os.path.join(lp.CIRCUIT_DIR, filepath)
-        if not os.path.isfile(temp):
-            pass
-        else:
-            filepath = temp
-    if ".cir" in filepath:
-        with codecs.open(filepath, "r", "utf-16LE") as fd:
-            Lines = fd.readlines()
-    elif ".txt" in filepath:
-        with open(filepath, "r") as f:
-            Lines = f.readlines()
-    else:
-        raise FileNotFoundError(
-            'Please supply a valid file with extension ".cir" or ".txt"'
-        )
-    # Ignore lines starting with * or .
-    Lines = [l.strip("\n").split(" ") for l in Lines if l[0] not in ["*", "."]]
-    Lines = np.array(Lines, dtype="<U16")
-
-    # Read descriptions and nodes, strip N from nodes
-    # Lines is desc | node1 | node2
-    desc = Lines[:, 0]
-    node1 = Lines[:, 1]
-    node2 = Lines[:, 2]
-    value = Lines[:, 3]
-    try:
-        value = value.astype(float)
-    except ValueError:
-        pass
-    node1 = np.array([x.strip("N") for x in node1], dtype=int)
-    node2 = np.array([x.strip("N") for x in node2], dtype=int)
-    netlist = pd.DataFrame(
-        {"desc": desc, "node1": node1, "node2": node2, "value": value}
-    )
-
-    # Populate the values based on the descriptions (element types)
-    for name, val in [
-        ("Ri", Ri),
-        ("Rc", Rc),
-        ("Rb", Rb),
-        ("Rl", Rb),
-        ("Rt", Rt),
-        ("I", I),
-        ("V", V),
-    ]:
-        if val is not None:
-            # netlist["desc"] consists of entries like 'Ri13'
-            # this map finds all the entries that start with (e.g.) 'Ri'
-            name_map = netlist["desc"].str.find(name) > -1
-            # then allocates the value to the corresponding indices
-            netlist.loc[name_map, ("value")] = val
-
-    lp.logger.notice("netlist " + filepath + " loaded")
-    return netlist
 
 
 def setup_circuit(
@@ -112,7 +13,6 @@ def setup_circuit(
     Rt=1e-5,
     I=80.0,
     V=4.2,
-    plot=False,
     terminals="left",
     configuration="parallel-strings",
 ):
@@ -337,144 +237,7 @@ def setup_circuit(
         main_grid[key] = np.concatenate((main_grid[key], current_loop[key]))
     netlist = pd.DataFrame(main_grid)
 
-    if plot:
-        lp.simple_netlist_plot(netlist)
-    lp.logger.notice("Circuit created")
     return netlist
-
-
-def solve_circuit(netlist):
-    """
-    Generate and solve the Modified Nodal Analysis (MNA) equations for the circuit.
-    The MNA equations are a linear system Ax = z.
-    See http://lpsa.swarthmore.edu/Systems/Electrical/mna/MNA3.html
-
-    Args:
-        netlist (pandas.DataFrame):
-            A netlist of circuit elements with format desc, node1, node2, value.
-
-    Returns:
-        V_node (np.ndarray):
-            Voltages of the voltage elements
-        I_batt (np.ndarray):
-            Currents of the current elements
-
-    """
-    timer = pybamm.Timer()
-
-    desc = np.array(netlist["desc"]).astype("<U16")
-    node1 = np.array(netlist["node1"])
-    node2 = np.array(netlist["node2"])
-    value = np.array(netlist["value"])
-    nLines = netlist.shape[0]
-
-    n = np.concatenate((node1, node2)).max()  # Number of nodes (highest node number)
-
-    m = 0  # "m" is the number of voltage sources, determined below.
-    V_elem = ["V", "O", "E", "H"]
-    for nm in desc:
-        if nm[0] in V_elem:
-            m += 1
-
-    # Construct the A matrix, which will be a (n+m) x (n+m) matrix
-    # A = [G    B]
-    #     [B.T  D]
-    # G matrix tracks the conductance between nodes (consists of floats)
-    # B matrix tracks voltage sources between nodes (consists of -1, 0, 1)
-    # D matrix is always zero for non-dependent sources
-    # Construct the z vector with length (n+m)
-    # z = [i]
-    #     [e]
-    # i is currents and e is voltages
-    # Use lil matrices to construct the A array
-    G = sp.sparse.lil_matrix((n, n))
-    B = sp.sparse.lil_matrix((n, m))
-    D = sp.sparse.lil_matrix((m, m))
-    i = np.zeros([n, 1])
-    e = np.zeros([m, 1])
-
-    """
-    % We need to keep track of the number of voltage sources we've parsed
-    % so far as we go through file.  We start with zero.
-    """
-    vsCnt = 0
-    """
-    % This loop does the bulk of filling in the arrays.  It scans line by line
-    % and fills in the arrays depending on the type of element found on the
-    % current line.
-    % See http://lpsa.swarthmore.edu/Systems/Electrical/mna/MNA3.html
-    """
-
-    for k1 in range(nLines):
-        n1 = node1[k1] - 1  # get the two node numbers in python index format
-        n2 = node2[k1] - 1
-        elem = desc[k1][0]
-        if elem == "R":
-            # Resistance elements: fill the G matrix only
-            g = 1 / value[k1]  # conductance = 1 / R
-            """
-            % Here we fill in G array by adding conductance.
-            % The procedure is slightly different if one of the nodes is
-            % ground, so check for those accordingly.
-            """
-            if n1 == -1:  # -1 is the ground node
-                G[n2, n2] = G[n2, n2] + g
-            elif n2 == -1:
-                G[n1, n1] = G[n1, n1] + g
-            else:
-                G[n1, n1] = G[n1, n1] + g
-                G[n2, n2] = G[n2, n2] + g
-                G[n1, n2] = G[n1, n2] - g
-                G[n2, n1] = G[n2, n1] - g
-        elif elem == "V":
-            # Voltage elements: fill the B matrix and the e vector
-            if n1 >= 0:
-                B[n1, vsCnt] = B[n1, vsCnt] + 1
-            if n2 >= 0:
-                B[n2, vsCnt] = B[n2, vsCnt] - 1
-            e[vsCnt] = value[k1]
-            vsCnt += 1
-
-        elif elem == "I":
-            # Current elements: fill the i vector only
-            if n1 >= 0:
-                i[n1] = i[n1] - value[k1]
-            if n2 >= 0:
-                i[n2] = i[n2] + value[k1]
-
-    # Construct final matrices from sub-matrices
-    upper = sp.sparse.hstack((G, B))
-    lower = sp.sparse.hstack((B.T, D))
-    A = sp.sparse.vstack((upper, lower))
-    # Convert a to csr sparse format for more efficient solving of the linear system
-    # csr works slighhtly more robustly than csc
-    A_csr = sp.sparse.csr_matrix(A)
-    z = np.vstack((i, e))
-
-    toc_setup = timer.time()
-    lp.logger.debug(f"Circuit set up in {toc_setup}")
-
-    # Scipy
-    # X = solve(A, z).flatten()
-    X = sp.sparse.linalg.spsolve(A_csr, z).flatten()
-    # Pypardiso
-    # X = pypardiso.spsolve(Aspr, z).flatten()
-
-    # amg
-    # ml = pyamg.smoothed_aggregation_solver(Aspr)
-    # X = ml.solve(b=z, tol=1e-6, maxiter=10, accel="bicgstab")
-
-    # include ground node (0V)
-    # it is counter-intuitive that z is [i,e] while X is [V,I], but this is correct
-    V_node = np.zeros(n + 1)
-    V_node[1:] = X[:n]
-    I_batt = X[n:]
-
-    toc = timer.time()
-    lp.logger.debug(f"Circuit solved in {toc - toc_setup}")
-    lp.logger.info(f"Circuit set up and solved in {toc}")
-
-    return V_node, I_batt
 
 
 def solve_circuit_vectorized(netlist):
@@ -493,8 +256,6 @@ def solve_circuit_vectorized(netlist):
         I_batt (np.ndarray):
             Currents of the current elements
     """
-    timer = pybamm.Timer()
-
     desc = np.array(netlist["desc"]).astype("<U1")  # just take first character
     node1 = np.array(netlist["node1"])
     node2 = np.array(netlist["node2"])
@@ -595,9 +356,6 @@ def solve_circuit_vectorized(netlist):
     A_csr = sp.sparse.csr_matrix(A)
     z = np.vstack((i, e))
 
-    toc_setup = timer.time()
-    lp.logger.debug(f"Circuit set up in {toc_setup}")
-
     # Scipy
     X = sp.sparse.linalg.spsolve(A_csr, z).flatten()
 
@@ -607,9 +365,6 @@ def solve_circuit_vectorized(netlist):
     V_node[1:] = X[:n]
     I_batt = X[n:]
 
-    toc = timer.time()
-    lp.logger.debug(f"Circuit solved in {toc - toc_setup}")
-    lp.logger.info(f"Circuit set up and solved in {toc}")
 
     return V_node, I_batt
 
@@ -717,7 +472,7 @@ def power_loss(netlist, include_Ri=False):
             is included
 
     """
-    V_node, I_batt = lp.solve_circuit_vectorized(netlist)
+    V_node, I_batt = solve_circuit_vectorized(netlist)
     R_map = netlist["desc"].str.find("R") > -1
     R_map = R_map.values
     if not include_Ri:
@@ -733,32 +488,3 @@ def power_loss(netlist, include_Ri=False):
     P_loss = V_diff**2 / R_value
     netlist["power_loss"] = 0.0
     netlist.loc[R_map, ("power_loss")] = P_loss
-
-
-def _fn(n):
-    if n == 0:
-        return "0"
-    else:
-        return "N" + str(n).zfill(3)
-
-
-def write_netlist(netlist, filename):
-    """
-    Write netlist to file
-
-    Args:
-        netlist (pandas.DataFrame):
-            A netlist of circuit elements with format desc, node1, node2, value.
-
-    """
-    lines = ["* " + filename]
-    for i, r in netlist.iterrows():
-        line = r.desc + " " + _fn(r.node1) + " " + _fn(r.node2) + " " + str(r.value)
-        lines.append(line)
-    lines.append(".op")
-    lines.append(".backanno")
-    lines.append(".end")
-    with open(filename, "w") as f:
-        for line in lines:
-            f.write(line)
-            f.write("\n")

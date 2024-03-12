@@ -3,7 +3,7 @@ import pybamm
 import numpy as np
 
 
-def _serial_eval(model, solutions, inputs_dict, variables, t_eval):
+def serial_eval(model, solutions, inputs_dict, variables):
     """
     Internal function to evaluate the model variables in a serial way.
 
@@ -16,9 +16,6 @@ def _serial_eval(model, solutions, inputs_dict, variables, t_eval):
         inputs_dict (iter of input_dicts):
             Provide inputs_dict objects for each battery.
         variables (variables evaluator):
-            Produced by _create_casadi_objects when mapped = False
-        t_eval (np.ndarray):
-            A float array of times to evaluate.
             Produced by _create_casadi_objects when mapped = False
 
     Returns:
@@ -47,7 +44,7 @@ def _serial_eval(model, solutions, inputs_dict, variables, t_eval):
     return casadi.horzcat(*var_eval)
 
 
-def _serial_step(model, solutions, inputs_dict, integrator, variables, t_eval, events):
+def serial_step(model, solutions, inputs_dict, integrator, variables, t_eval, events):
     """
     Internal function to process the model for one timestep in a serial way.
 
@@ -115,7 +112,7 @@ def _serial_step(model, solutions, inputs_dict, integrator, variables, t_eval, e
     return sol, casadi.horzcat(*var_eval), casadi.horzcat(*events_eval)
 
 
-def _create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
+def create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
     """
     Internal function to produce the casadi objects in their mapped form for
     parallel evaluation
@@ -225,3 +222,91 @@ def _create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
         "initial_solutions": initial_solutions,
     }
     return output
+
+
+def build_inputs_dict(I_batt, inputs):
+    """
+    Function to convert inputs and external_variable arrays to list of dicts
+    As expected by the casadi solver. These are then converted back for mapped
+    solving but stored individually on each returned solution.
+    Can probably remove this process later
+
+    Args:
+        I_batt (np.ndarray):
+            The input current for each battery.
+        inputs (dict):
+            A dictionary with key of each input and value an array of input
+            values for each battery.
+
+    Returns:
+        inputs_dict (list):
+            each element of the list is an inputs dictionary corresponding to each
+            battery.
+
+
+    """
+    inputs_dict = {}
+    current_dict = {"Current function [A]": I_batt}
+    inputs_dict.update(current_dict)
+    if inputs is not None:
+        inputs_dict.update(inputs)
+    keys = inputs_dict.keys()
+    dicts = []
+    for values in zip(*list(inputs_dict.values())):
+        dicts.append(dict(zip(keys, values)))
+    return dicts
+
+
+def setup_basic_simulation(parameter_values, initial_soc):
+    """
+    Update initial concentration parameters
+
+    Args:
+        param (pybamm.ParameterValues):
+            The battery simulation parameters.
+        SoC (float):
+            Target initial SoC. Must be between 0 and 1. Default is -1, in which
+            case the initial concentrations are set using the target OCV.
+
+    Returns:
+        sim (pybamm.Simulation):
+            A simulation that can be solved individually or passed into the
+            liionpack solve method
+    """
+    if np.any(initial_soc < 0) or np.any(initial_soc > 1):
+        raise ValueError("Initial SOC should be between 0 and 1")
+
+    c_n_max = parameter_values["Maximum concentration in negative electrode [mol.m-3]"]
+    c_p_max = parameter_values["Maximum concentration in positive electrode [mol.m-3]"]
+
+    param = pybamm.LithiumIonParameters()
+    esoh_solver = pybamm.lithium_ion.ElectrodeSOHSolver(parameter_values, param)
+    x, y =  esoh_solver.get_initial_stoichiometries(initial_soc)
+
+    if x is not None:
+        c_s_n_init, c_s_p_init = x * c_n_max, y * c_p_max
+    parameter_values.update(
+        {
+            "Initial concentration in negative electrode [mol.m-3]": c_s_n_init,
+            "Initial concentration in positive electrode [mol.m-3]": c_s_p_init,
+        }
+    )
+
+    # Create the pybamm model
+    model = pybamm.lithium_ion.SPM()
+
+    # Add events to the model
+    for event in model.events:
+        model.variables.update({"Event: " + event.name: event.expression})
+
+    # Set up parameter values
+    param = parameter_values.copy()
+
+    # Set up solver and simulation
+    solver = pybamm.CasadiSolver(mode="safe")
+    sim = pybamm.Simulation(
+        model=model,
+        parameter_values=param,
+        solver=solver,
+    )
+    return sim

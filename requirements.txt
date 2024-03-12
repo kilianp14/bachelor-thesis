@@ -1,0 +1,6 @@
+lcapy
+matplotlib
+numpy
+pandas
+scipy
+pybamm==23.9
