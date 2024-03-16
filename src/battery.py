@@ -1,6 +1,8 @@
 import numpy as np
 import pybamm
 
+from vessim.storage import Storage
+
 from solver_utils import create_casadi_objects, serial_step, serial_eval, setup_basic_simulation, build_inputs_dict
 from netlist_utils import solve_circuit_vectorized, power_loss
 
@@ -11,20 +13,17 @@ class Actor:
 
     def setup(
         self,
-        Nspm,
         parameter_values,
         dt,
         inputs,
         variable_names,
         initial_soc,
     ):
-        self.Nspm = Nspm
-
         # Set up simulation
         self.simulation = setup_basic_simulation(parameter_values, initial_soc)
 
         # Set up integrator
-        casadi_objs = create_casadi_objects(inputs, self.simulation, dt, Nspm, variable_names)
+        casadi_objs = create_casadi_objects(inputs, self.simulation, dt, variable_names)
         self.model = self.simulation.built_model
         self.integrator = casadi_objs["integrator"]
         self.variables_fn = casadi_objs["variables_fn"]
@@ -75,10 +74,10 @@ class Actor:
         return self.event_names
 
     def output(self):
-        return self.var_eval
+        return np.array(self.var_eval, dtype=np.float32)
 
 
-class Manager:
+class BatteryPack(Storage):
     """ 
     Class for step-by-step solving of a lithium-ion-battery-pack.
 
@@ -102,9 +101,7 @@ class Manager:
         netlist,
         parameter_values,
         step_size,
-        Nsteps,
         initial_soc,
-        inputs = None,
         output_variables = None,
     ):
         self.netlist = netlist
@@ -117,14 +114,13 @@ class Manager:
         self.Terminal_Node = np.array(netlist[self.I_map].node1)
         self.Nspm = np.sum(self.V_map)
 
-        self.Nsteps = Nsteps + 1
         self.step_size = step_size
         # If the step is starting with a rest the current will be zero and
         # this messes up the internal resistance calc. Add a very small current
         # for init.
         netlist.loc[self.I_map, ("value")] = 1e-3
         # Solve the circuit to initialise the electrochemical models
-        _, I_batt = solve_circuit_vectorized(netlist)
+        V_node, I_batt = solve_circuit_vectorized(netlist)
 
         # The simulation output variables calculated at each step for each battery
         # Must be a 0D variable i.e. battery wide volume average - or X-averaged for
@@ -140,28 +136,18 @@ class Manager:
         self.Nvar = len(self.variable_names)
 
         # Storage variables for simulation data
-        self.shm_i_app = np.zeros([self.Nsteps, self.Nspm], dtype=np.float32)
-        self.shm_Ri = np.zeros([self.Nsteps, self.Nspm], dtype=np.float32)
-        self.output = np.zeros([self.Nvar, self.Nsteps, self.Nspm], dtype=np.float32)
-        self.current = np.zeros([self.Nsteps])
-
-        # Initialize currents in battery models
-        self.shm_i_app[0, :] = I_batt * -1
-
-        # Step forward in time
-        self.V_terminal = np.zeros(self.Nsteps, dtype=np.float32)
-        self.record_times = np.zeros(self.Nsteps, dtype=np.float32)
+        self.shm_Ri = np.zeros([self.Nspm], dtype=np.float32)
+        self.output = np.zeros([self.Nvar, self.Nspm], dtype=np.float32)
+        self.shm_i_app = (I_batt * -1).astype(np.float32)
+        self.last_current = 0.0
+        self.V_terminal = np.float32(V_node[self.Terminal_Node][0])
 
         self.v_cut_lower = parameter_values["Lower voltage cut-off [V]"]
         self.v_cut_higher = parameter_values["Upper voltage cut-off [V]"]
 
-        # Handle the inputs
-        self.inputs = inputs
-        self.inputs_dict = build_inputs_dict(self.shm_i_app[0, :], self.inputs)
-        
+        self.inputs_dict = build_inputs_dict(self.shm_i_app)
         self.actor = Actor()
         self.actor.setup(
-            Nspm=self.Nspm,
             parameter_values=self.parameter_values,
             dt=self.step_size,
             inputs=self.inputs_dict,
@@ -171,58 +157,58 @@ class Manager:
         # Get the initial state of the system
         self.actor.evaluate(self.inputs_dict)
         self.step = -1
-
-    def step_output(self):
-        self.shm_Ri = np.abs(self.shm_Ri)
-        # Collect outputs
-        self.step_output = {}
-        self.step_output["Time [s]"] = self.record_times[self.step]
-        self.step_output["Pack current [A]"] = self.current[self.step]
-        self.step_output["Pack terminal voltage [V]"] = self.V_terminal[self.step]
-        self.step_output["Cell current [A]"] = self.shm_i_app[self.step, :]
-        self.step_output["Cell internal resistance [Ohm]"] = self.shm_Ri[self.step, :]
+    
+    def state(self):
+        state = {}
+        state["Pack current [A]"] = self.last_current
+        state["Pack terminal voltage [V]"] = self.V_terminal
+        state["Cell current [A]"] = self.shm_i_app[:]
+        state["Cell internal resistance [Ohm]"] = self.shm_Ri[:]
         for j in range(self.Nvar):
-            self.step_output[self.variable_names[j]] = self.output[j,self.step, :]
+            state[self.variable_names[j]] = self.output[j,:]
+        return state
+    
+    def soc(self):
+        pass
+
+    def update(self, power, duration):
+        current = power / self.V_terminal
+        self.perform_step(current)
+        return 0.0
 
     def perform_step(self, current):
         self.step += 1
-        self.current[self.step] = current
         # 01 Calculate whether resting or restarting
         self.resting = (
-            self.step > 0 and current == 0.0 and self.current[self.step - 1] == 0.0
+            self.step > 0 and current == 0.0 and self.last_current == 0.0
         )
         self.restarting = (
-            self.step > 0 and current != 0.0 and self.current[self.step - 1] == 0.0
+            self.step > 0 and current != 0.0 and self.last_current == 0.0
         )
         # 02 Get the actor output - Battery state info
-        self.output[:, self.step, :] = self.actor.output()
+        self.output = self.actor.output()
         # 03 Get the ocv and internal resistance
-        temp_v = self.output[0, self.step, :]
-        temp_ocv = self.output[1, self.step, :]
+        temp_v = self.output[0,:]
+        temp_ocv = self.output[1,:]
         # When resting and rebalancing currents are small the internal
         # resistance calculation can diverge as it's R = V / I
         # At rest the internal resistance should not change greatly
         # so for now just don't recalculate it.
         if not self.resting and not self.restarting:
             self.temp_Ri = self.calculate_internal_resistance()
-        self.shm_Ri[self.step, :] = self.temp_Ri
+        self.shm_Ri[:] = self.temp_Ri
         # 04 Update netlist
         self.netlist.loc[self.V_map, ("value")] = temp_ocv
         self.netlist.loc[self.Ri_map, ("value")] = self.temp_Ri
         self.netlist.loc[self.I_map, ("value")] = current
         power_loss(self.netlist)
         # 05 Solve the circuit with updated netlist
-        if self.step <= self.Nsteps:
-            V_node, I_batt = solve_circuit_vectorized(self.netlist)
-            self.record_times[self.step] = self.step * self.step_size
-            self.V_terminal[self.step] = V_node[self.Terminal_Node][0]
-        if self.step < self.Nsteps - 1:
-            # igore last step save the new currents and build inputs
-            # for the next step
-            I_app = I_batt[:] * -1
-            self.shm_i_app[self.step, :] = I_app
-            self.shm_i_app[self.step + 1, :] = I_app
-            self.inputs_dict = build_inputs_dict(I_app, self.inputs)
+        V_node, I_batt = solve_circuit_vectorized(self.netlist)
+        self.record_times = self.step * self.step_size
+        self.V_terminal = np.float32(V_node[self.Terminal_Node][0])
+        I_app = I_batt[:] * -1
+        self.shm_i_app[:] = I_app.astype(np.float32)
+        self.inputs_dict = build_inputs_dict(I_app)
         # 06 Check if voltage limits are reached and terminate
         if np.any(temp_v < self.v_cut_lower):
             raise RuntimeError("Low voltage limit reached")
@@ -234,16 +220,8 @@ class Manager:
             self.log_event()
         
         self.shm_Ri = np.abs(self.shm_Ri)
-        step_output = {}
-        step_output["Time [s]"] = self.record_times[self.step]
-        step_output["Pack current [A]"] = self.current[self.step]
-        step_output["Pack terminal voltage [V]"] = self.V_terminal[self.step]
-        step_output["Cell current [A]"] = self.shm_i_app[self.step, :]
-        step_output["Cell internal resistance [Ohm]"] = self.shm_Ri[self.step, :]
-        for j in range(self.Nvar):
-            step_output[self.variable_names[j]] = self.output[j, self.step, :]
 
-        return step_output
+        self.last_current = current
 
     def check_current_function(self):
         i_func = self.parameter_values["Current function [A]"]
@@ -255,9 +233,9 @@ class Manager:
 
     def calculate_internal_resistance(self):
         # Calculate internal resistance and update netlist
-        temp_v = self.output[0, self.step, :]
-        temp_ocv = self.output[1, self.step, :]
-        temp_I = self.shm_i_app[self.step, :]
+        temp_v = self.output[0,:]
+        temp_ocv = self.output[1,:]
+        temp_I = self.shm_i_app[:]
         temp_Ri = np.abs((temp_ocv - temp_v) / temp_I)
         temp_Ri[temp_Ri == 0.0] = 1e-6
         return temp_Ri

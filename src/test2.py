@@ -7,7 +7,7 @@ parameter_values = pybamm.ParameterValues("Chen2020")
 
 experiment = pybamm.Experiment(
     [
-        "Discharge at 6A for 50 seconds",
+        "Discharge at 6A for 5000 seconds",
     ],
     period="5 seconds",
 )

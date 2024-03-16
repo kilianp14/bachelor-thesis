@@ -112,7 +112,7 @@ def serial_step(model, solutions, inputs_dict, integrator, variables, t_eval, ev
     return sol, casadi.horzcat(*var_eval), casadi.horzcat(*events_eval)
 
 
-def create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
+def create_casadi_objects(inputs, sim, dt, variable_names):
     """
     Internal function to produce the casadi objects in their mapped form for
     parallel evaluation
@@ -126,8 +126,6 @@ def create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
         dt (float):
             The time interval (in seconds) for a single timestep. Fixed throughout
             the simulation
-        Nspm (int):
-            Number of individual batteries in the pack.
         variable_names (list):
             Variables to evaluate during solve. Must be a valid key in the
             model.variables
@@ -224,7 +222,7 @@ def create_casadi_objects(inputs, sim, dt, Nspm, variable_names):
     return output
 
 
-def build_inputs_dict(I_batt, inputs):
+def build_inputs_dict(I_batt):
     """
     Function to convert inputs and external_variable arrays to list of dicts
     As expected by the casadi solver. These are then converted back for mapped
@@ -234,26 +232,15 @@ def build_inputs_dict(I_batt, inputs):
     Args:
         I_batt (np.ndarray):
             The input current for each battery.
-        inputs (dict):
-            A dictionary with key of each input and value an array of input
-            values for each battery.
 
     Returns:
         inputs_dict (list):
             each element of the list is an inputs dictionary corresponding to each
             battery.
-
-
     """
-    inputs_dict = {}
-    current_dict = {"Current function [A]": I_batt}
-    inputs_dict.update(current_dict)
-    if inputs is not None:
-        inputs_dict.update(inputs)
-    keys = inputs_dict.keys()
     dicts = []
-    for values in zip(*list(inputs_dict.values())):
-        dicts.append(dict(zip(keys, values)))
+    for i_batt in I_batt:
+        dicts.append({"Current function [A]": i_batt})
     return dicts
 
 
