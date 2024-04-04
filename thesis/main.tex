@@ -7,6 +7,7 @@
 \usepackage{indentfirst}
 \usepackage{geometry}
 \usepackage{graphicx}
+\usepackage[skip=5pt plus1pt, indent=15pt]{parskip}
 
 \graphicspath{{/Images}}
 
@@ -41,10 +42,15 @@
 \tableofcontents
 
 \chapter{Introduction}
-\input{Chapters/Introduction}
+\input{thesis/Chapters/Introduction}
 
-%\chapter{Related Work}
-%\input{Chapters/Related Work}
+\input{thesis/Chapters/Problem_Statement}
+
+\chapter{Background}
+\input{thesis/Chapters/Background}
+
+\chapter{Related Work}
+\input{thesis/Chapters/Related_Work}
 
 \bibliographystyle{ieeetr}
 \bibliography{References}

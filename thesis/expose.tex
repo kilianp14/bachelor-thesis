@@ -6,8 +6,10 @@
 \usepackage{amsfonts}
 \usepackage{indentfirst}
 \usepackage{geometry}
+\usepackage[skip=5pt plus1pt, indent=15pt]{parskip}
 
 \begin{document}
+\selectlanguage{english}
 
 \begin{center}
     \LARGE
@@ -23,7 +25,47 @@
 \end{center}
 
 \section*{Introduction}
-\input{Chapters/Introduction}
+\input{thesis/Chapters/Introduction}
+
+\section*{Problem Statement}
+\input{thesis/Chapters/Problem_Statement}
+
+\section*{Related Work}
+Li et al. \cite{SustainableEdgeComputing} proposed a comprehensive energy management framework that facilitates a sustainable edge computing paradigm with distributed renewable energy sources. Their approach aims to integrate microgrid and edge computing technologies to increase energy resource efficiency by enabling collaboration between the systems. It is evaluated by the development of a hardware prototype system with a solar-wind hybrid power system, batteries, and two servers, acting as an edge computing system. However, the authors did not address software-based modelling and simulation approaches for such a system of systems, and instead presented a design idea for future resource management in an edge-computing environment.
+
+Alzahrani et al. \cite{alzahrani2017modeling} focused on presenting various models of energy system parts, and simulated a small-scale microgrid, while treating all the different components as autonomous systems. The work further describes system modelling, utilizing time series neural networks to generate solar and wind power data as well as load profiles and storage state-of-charge estimations during the simulation. Despite their discussion of battery models, the simulations used for the evaluation did not include an energy storage system, and instead treated the system as purely grid-connected.
+
+\section*{Approach}
+The objective of this bachelor's thesis is to investigate the behavior of simple and complex energy storage models within a co-simulated microgrid environment with various power generators and consumers.
+
+Thereby, the co-simulation framework Vessim \cite{wiesner2023testbed} will be used for microgrid simulation with different battery models as storage components. On the one hand, the rather simple battery model by the Carbon Explorer \cite{acun2022holistic} is applied, and on the other hand, a complex physics-based model of a lithium-ion battery pack is simulated utilizing the PyBaMM framework \cite{pybammbatteries} and methods for the simulation of battery packs by the liionpack python package \cite{tranter2022liionpack}.
+
+The state of the storage is constantly monitored, and by that, it will be evaluated, how accurate the simple model performs compared to the physical baseline model.
+
+\section*{Time Schedule}
+\begin{enumerate}
+    \item Investigate Background and Related Work (3 Weeks)
+    \begin{itemize}
+        \item Further research in the areas of Microgrids, Battery Models, Edge Computing, and Co-simulation
+        \item Writing of Background and Related Work chapters
+    \end{itemize}
+    \item Elaborate on Approach (2 Weeks)
+    \begin{itemize}
+        \item Specify scenarios used for evaluation and gather useful data
+        \item Writing of Approach chapter
+    \end{itemize}
+    \item Scenario implementation and Evaluation (7 Weeks)
+    \begin{itemize}
+        \item Integrate different scenarios and models into Vessim and evaluate the behavior
+        \item Writing of Implementation and Evaluation chapters
+    \end{itemize}
+    \item Finishing Up (5 Weeks)
+    \begin{itemize}
+        \item Fine-tuning of written chapters and general design
+        \item Writing of Conclusion/Discussion and Abstracts
+        \item Hand in thesis
+    \end{itemize}
+\end{enumerate}
 
 \bibliographystyle{ieeetr}
 \bibliography{References}
