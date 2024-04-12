@@ -14,7 +14,7 @@
 \begin{center}
     \LARGE
     \vspace{2em}
-    \textbf{Energy Storage Modelling inside Microgrid Co-Simulation}
+    \textbf{Modeling Energy Storage in Co-Simulation Testbeds for Data Centers}
 
     \large
     \vspace{2em}
@@ -35,16 +35,20 @@ Li et al. \cite{SustainableEdgeComputing} proposed a comprehensive energy manage
 
 Alzahrani et al. \cite{alzahrani2017modeling} focused on presenting various models of energy system parts, and simulated a small-scale microgrid, while treating all the different components as autonomous systems. The work further describes system modelling, utilizing time series neural networks to generate solar and wind power data as well as load profiles and storage state-of-charge estimations during the simulation. Despite their discussion of battery models, the simulations used for the evaluation did not include an energy storage system, and instead treated the system as purely grid-connected.
 
-\newpage
-
 \section*{Approach}
-The objective of this bachelor's thesis is to investigate the behavior of simple and complex energy storage models within a co-simulated microgrid environment with various power generators and consumers.
+The objective of this bachelor's thesis is to investigate the integration of simple and complex energy storage models into a co-simulated microgrid environment with various power generators and consumers.
 
-Thereby, the co-simulation framework Vessim \cite{wiesner2023testbed} will be used for microgrid simulation with different battery models as storage components. On the one hand, the rather simple battery model by the Carbon Explorer \cite{acun2022holistic} is applied, and on the other hand, a complex physics-based model of a lithium-ion battery pack is simulated utilizing the PyBaMM framework \cite{pybammbatteries} and methods for the simulation of battery packs by the liionpack python package \cite{tranter2022liionpack}.
+Thereby, the co-simulation framework Vessim \cite{wiesner2023testbed} will be extended to provide an interface for the definition of various battery models as storage components to be used in a microgrid simulation. To verify the approach, on the one hand, the rather simple battery model by the Carbon Explorer \cite{acun2022holistic}, and on the other hand, a complex physics-based model of a lithium-ion battery pack utilizing the PyBaMM framework \cite{pybammbatteries} and methods for the simulation of battery packs by the liionpack python package \cite{tranter2022liionpack} is integrated into Vessim.
 
-It will be explored, how these models can be integrated into a discrete event simulation environment, and how the charging and discharging of the energy storage can be modeled without the simulation of an underlying power network.
+It will be explored, how these different models can be used in a discrete event simulation environment and the following challenges will be discussed:
+\begin{itemize}
+    \item How can the parameters of different storage models be monitored?
+    \item How can the charging and discharging of the batteries from the grid be modeled?
+    \item How can the state-of-charge of complex models be determined? 
+    \item How can the charging and discharging of a physics-based battery be modeled without the simulation of an underlying power network?
+\end{itemize}
 
-The behavior of the two models will be evaluated based on a simple scenario with multiple energy producers and consumers, where the storage state is constantly monitored, and a comparison between the models will be made.
+Finally, the behavior of the models will be evaluated based on a simple scenario with multiple energy producers and consumers, where the storage state is constantly monitored, and a comparison between the models will be made.
 
 \section*{Time Schedule}
 \begin{enumerate}
