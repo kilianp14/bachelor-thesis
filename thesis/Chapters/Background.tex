@@ -1,6 +1,7 @@
 This chapter provides a comprehensive overview of relevant concepts that are essential for this work.
 
 \section{Microgrids}
+\label{microgrids}
 Economic, technological, and environmental factors are driving changes in how electricity is generated and transmitted. The dominance of large centralized power plants is diminishing and giving way to smaller, more decentralized models, partly due to the decreasing advantages of traditional economies of scale \cite{MicrogridConcept}. The concept of a microgrid was first presented by Lasseter \cite{Microgrid} as early as 2002, describing a paradigm to define the operation of distributed generation. The core idea is to perceive such generators and associated loads as a system of its own to allow for local control, thereby providing a higher local reliability and efficiency.
 
 The CIGRÉ Working Group C6.22 \textit{Microgrid Evolution Roadmap}  defines the following components as the foundational elements of a microgrid \cite{MicrogridKeyComponents}:
@@ -11,3 +12,20 @@ The CIGRÉ Working Group C6.22 \textit{Microgrid Evolution Roadmap}  defines the
 \end{itemize}
 
 In addition to that, a microgrid can operate in two different modes: grid-connected and islanded \cite{MicrogridConcept, MicrogridKeyComponents, MicrogridComprehensiveStudy}. In the grid-connected mode, the microgrid functions as a part of the larger utility grid, while drawing power from the grid as needed, enabling it to benefit from the main grids stability and reliability. During certain phases like grid outages, the microgrid is capable of a seamless transition into islanded mode where it disconnects from the grid and operates autonomously, relying solely on its own distributed energy resources to meet local energy demands. Effective control and coordination mechanisms are thereby essential for smooth transitions between these two modes, to optimize energy management and ensure reliable operation under varying conditions.
+
+\section{Co-Simulation}
+\label{co-simulation}
+Simulation is a powerful tool that enables the recreation of a real-world system or process in a controlled environment, offering insights into complex scenarios, predicting outcomes, and testing hypotheses without the risks and costs associated with experimenting on a real system or real hardware. In a world of ever-increasing system complexity, co-simulation presents a way to leverage from established tools for the simulation of subsystems, by running such simulators concurrently, and defining the interactions between them \cite{schweiger2019empirical}.
+
+Co-simulation encompasses the theoretical framework as well as practical methodologies, facilitating the global simulation of interconnected systems through the integration of multiple simulators. In this approach, each simulator serves as a self-contained entity, analogous to a black box, possessing the capability to emulate specific behaviors, consuming inputs, and generate outputs \cite{gomes2018co}. Therefore, the concept of co-simulation acknowledges the complexity of interconnected systems that often consist of diverse subsystems with distinct computational models or even physical laws, rather than attempting to fit the entire system into a single monolithic simulation environment.
+
+In a co-simulated scenario, each individual component or subsystem has its simulation unit that produces a behavior trace (or simulation) when given inputs, and, if it is not a real-world entity, has the following components: A Model of the system under study that is a dynamical system with a state and a notion of evolution rules, and a Solver/Simulator that works as an algorithm computing or approximating the behavior trace of a model \cite{gomes2018co, schweiger2019empirical}. When these simulation units are coupled using their inputs and outputs, they produce a combined behavior trace of the entire modeled system, which is called co-simulation.
+
+Because the simulation units are treated as independent black-boxes, to run a co-simulation, a separate orchestrator is needed, next to the co-simulation scenario, to handle the coupling at the behavioral level. The orchestrator is responsible for the initialization of the simulation units, the connection of their inputs and outputs, and the progression of simulated time in the individual components. Gomes et al. \cite{gomes2018co} defines three different approaches for the operation of orchestrators:
+\begin{itemize}
+    \item[] In \textbf{Discrete-Event} based co-simulation
+    \item[] In \textbf{Continuous-Time} based co-simulation
+    \item[] Finally, in \textbf{Hybrid} co-simulation
+\end{itemize}
+
+- Discuss a few advantages of co-simulation
