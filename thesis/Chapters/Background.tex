@@ -1,4 +1,4 @@
-This chapter provides a comprehensive overview of relevant concepts that are essential for this work.
+This chapter provides a comprehensive overview of relevant concepts that are essential for this work. Section \ref{microgrids} introduces the principles of microgrid infrastructures, while section \ref{co-simulation} focuses on co-simulation and thereby describes different approaches to model complex systems.
 
 \section{Microgrids}
 \label{microgrids}
@@ -23,9 +23,12 @@ In a co-simulated scenario, each individual component or subsystem has its simul
 
 Because the simulation units are treated as independent black-boxes, to run a co-simulation, a separate orchestrator is needed, next to the co-simulation scenario, to handle the coupling at the behavioral level. The orchestrator is responsible for the initialization of the simulation units, the connection of their inputs and outputs, and the progression of simulated time in the individual components. Gomes et al. \cite{gomes2018co} defines three different approaches for the operation of orchestrators:
 \begin{itemize}
-    \item[] In \textbf{Discrete-Event} based co-simulation
-    \item[] In \textbf{Continuous-Time} based co-simulation
-    \item[] Finally, in \textbf{Hybrid} co-simulation
+    \item[] In \textbf{Discrete-Event} based co-simulation, the scenario consists of multiple discrete-event simulation units, which means that they communicate with the environment using timestamped events. Their internal state can change despite the simulation time being stopped (reactivity), and events can trigger other events instantaneously (transiency). The orchestrator hereby handles the mapping between output events of one unit to external events in another unit.
+    \item[] In \textbf{Continuous-Time} based co-simulation, the state of each continuous-time simulation unit evolves constantly. The orchestrator has to set a communication step-size, defining the times when the units exchange their input/output values because the simulation units each have independent micro step-sizes.
+    \item[] Finally, in \textbf{Hybrid} co-simulation, the characteristics of both kinds of simulation units are combined. The orchestrator can be either discrete-event based or continuous-time based, whereas the behavior of the simulation units have to be wrapped to become discrete-event or continuous-time based units.
 \end{itemize}
 
-- Discuss a few advantages of co-simulation
+Each simulation unit within a co-simulation setup operates as an independent module with a separate simulation algorithm, which allows for flexibility in selecting and implementing appropriate models for each subsystem. For complex systems comprised of diverse components, this modularity ensures that specialized models tailored to the characteristics of each subsystem can be integrated seamlessly. The black-box approach employed in co-simulation treats individual components as interchangeable entities. This means that as long as the inputs and outputs of a component adhere to a predefined interface, it can be swapped with alternative components without necessitating extensive modifications to the overall system architecture.
+
+\section{Something bout battery modeling}
+C/L/C model for lithium-ion batteries \cite{kazhamiaka2019tractable}
