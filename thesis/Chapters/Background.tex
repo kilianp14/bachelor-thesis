@@ -30,11 +30,26 @@ Because the simulation units are treated as independent black-boxes, to run a co
 
 Each simulation unit within a co-simulation setup operates as an independent module with a separate simulation algorithm, which allows for flexibility in selecting and implementing appropriate models for each subsystem. For complex systems comprised of diverse components, this modularity ensures that specialized models tailored to the characteristics of each subsystem can be integrated seamlessly. The black-box approach employed in co-simulation treats individual components as interchangeable entities. This means that as long as the inputs and outputs of a component adhere to a predefined interface, it can be swapped with alternative components without necessitating extensive modifications to the overall system architecture.
 
+Following this, the next sections will present relevant frameworks for this work using co-simulation, where section \ref{mosaik_framework} explains the Mosaik framework \cite{mosaik}, and section \ref{vessim_infrastructure} introduces Vessim \cite{vessim}, which is used for evaluating the approaches of this thesis and builds on top of Mosaik.
+
 \subsection{The Mosaik Framework}
+\label{mosaik_framework}
+Mosaik \cite{mosaik} was designed to be used as a co-simulation framework to study scenarios in the area of the smart grid \cite{Smart-Grids}, which can, for instance, serve as testbeds for different control strategies in the smart grid. Nowadays, however, it can easily be used as a flexible co-simulator for various environments by combining different simulation units to create large-scale scenarios.
+
+At its core, Mosaik is responsible for synchronizing processes that each run a simulation, and to manage data-flows between them. To achieve this, the framework encompasses four main components \footnote{These main components are listed in the Mosaik documentation under the following link: \url{https://mosaik.readthedocs.io/en/3.3.0/overview.html}}:
+\begin{itemize}
+    \item[] \textbf{Mosaik API:} Establishes a common protocol for communication between the Mosaik-core and the coupled simulators. While the low-level API is based on network sockets for the passing of JSON messages, there are also high-level APIs available for various programming languages, which provides an extra abstraction layer by handling the networking.
+    \item[] \textbf{Scenario API:} Python API for creating simulation scenarios, which makes it possible to define data flows by connecting simulation units, and to execute these scenarios by starting the different simulation units. 
+    \item[] \textbf{Simulation Manager:} Handles external simulator processes and communicates with them. They are internally represented by proxy objects so that it makes no difference to other Mosaik components if the simulators are in-process with the Mosaik-core, started by Mosaik itself, or if Mosaik simply connected to a running simulator instance.
+    \item[] \textbf{Mosaik Scheduler:} The discrete-event orchestrator of the co-simulation. It is responsible for stepping the simulators through time while keeping them synchronized, and the data passing of inputs and outputs between the simulation units. Mosaik allows these simulation units to be continuous-time based or hybrid by wrapping each of them in a discrete-event simulation unit.
+\end{itemize}
+
 \subsection{Vessim Infrastructure}
+\label{vessim_infrastructure}
 \begin{figure*}
     \includegraphics[width=\linewidth]{thesis/Images/Vessim_Infrastructure.pdf}
-    \caption{Vessim Infrastructure as described by Wiesner et al.}
+    \caption{Vessim Infrastructure as described by Wiesner et al. \cite{vessim}.}
+    \label{fig:vessim_infrastructure}
 \end{figure*}
 
 \section{Something bout battery modeling}
