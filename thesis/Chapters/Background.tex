@@ -1,4 +1,4 @@
-This chapter provides a comprehensive overview of relevant concepts that are essential for this work. Section \ref{microgrids} introduces the principles of microgrid infrastructures, while section \ref{co-simulation} focuses on co-simulation and thereby describes different approaches to model complex systems.
+This chapter provides a comprehensive overview of relevant concepts that are essential for this work. Section \ref{microgrids} introduces the principles of microgrid infrastructures, while section \ref{co-simulation} focuses on co-simulation and thereby describes different approaches to model complex systems. Finally, section \ref{lithium_ion_battery_models} presents models for lithium-ion batteries, which are used for evaluating the approach.
 
 \section{Microgrids}
 \label{microgrids}
@@ -54,14 +54,24 @@ With the goal of accelerating research in the area of sustainable computing, Wie
     \label{fig:vessim_infrastructure}
 \end{figure*}
 
-The co-simulation infrastructure of a single microgrid, which is depicted in Figure \ref{fig:vessim_infrastructure}, consists of four distinct subsystems that are stepped in a specific order:
+The co-simulation infrastructure of a single microgrid, which is depicted in Figure \ref{fig:vessim_infrastructure}, is defined using the Mosaik Scenario API, and the individual simulation units implement the high-level Python API of Mosaik. A Vessim microgrid consists of four distinct subsystems that are stepped in a specific order, whereas the Mosaik Scheduler handles data passing and synchronization.
 \begin{enumerate}
     \item \textbf{Actors:} The actors model the energy consumers and producers of the microgrid, and are characterized by their individual power trace $p^{<\text{actor}>}$. Every actor has its separate Mosaik simulation unit, which forwards the actor's power production ($p_t^{<\text{actor}>} > 0$) or power consumption ($p_t^{<\text{actor}>} < 0$) at every simulation step $t$. The actor models are highly variable as they can be everything from simulated nodes, which only read out historical traces of, for instance, solar irradiance or computation load, to nodes that monitor full on server farms, running hundreds of virtual machines where the power consumption is measured using power meters. Due to this high diversity, the actors also have the option to provide controllers with additional information to allow for better decision-making by transmitting their state ($\text{state}_t^{<\text{actor}>}$) to them.
     \item  \textbf{Grid:} The Grid simulator is responsible to model the power flow inside the microgrid's power network. At every simulation step $t$, it gets the power trace of the actors as input, and produces a power delta $\Delta p_t$ that can be stored to or has to be discharged from the energy storage. To accurately model this power flow, frameworks like PyPSA \cite{brown2017pypsa} can be used, but for many cases, a simple aggregation $\Delta p_t = \sum{p_t^{<\text{actor}>}}$ is enough.
     \item \textbf{Controllers:} Users can define custom controllers that can monitor and configure the energy and computing systems during the simulation. Controllers receive the entire state of the microgrid's energy system at every simulation step $t$. Next to the state of all the actors ($\text{state}_t^{<\text{actor}>}$) and the state of the energy storage ($\text{state}_t^{s}$), this also includes the current power delta ($\Delta p_t$) as well as the excess energy or energy deficit that the energy system had since the last time step ($e_{t-1}$). With all this information, which can also be extended by other signals like production and load forecasts, the controllers have the flexibility, next to monitoring, to also reduce consumption by throttling the computing system or tweak the energy storage configuration.
-    \item \textbf{Storage:}
+    \item \textbf{Storage:} The storage simulator manages the charging and discharging of the microgrid's energy storage (if present), and the exchanging of energy with the public utility grid. With that, it essentially models the progression of time between simulation time steps while the other subsystems are effectively executed simultaneously at the time steps. It gets the computed ($\Delta p_t$), and provides information regarding the new state of the storage ($\text{state}^s_{t+1}$), and the amount of energy that has been drawn from/ fed into the public grid between the time steps to the controllers ($e_t$). Because the storage simulator is stepped after the controllers, the controllers always receive the information from the previous time step.
 \end{enumerate}
 
-\section{Something bout battery modeling}
+This thesis aims to extend upon the Vessim approach by further specifying the storage subsystem of the discussed simulated microgrid. This refined infrastructure will then be used together with simple and complex battery models to show that the described environment can be used as a co-simulation testbed for data centers that allows for the use of variable energy storage modeling approaches.
+
+\section{Lithium-Ion Battery Models}
+\label{lithium_ion_battery_models}
+This section presents a quick overview of relevant models of lithium-ion batteries that are applied in this thesis. Section \ref{c_l_c_model} discusses the C/L/C model as described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, and section \ref{single_particle_model} presents the single particle model for lithium-ion batteries.
+
+\subsection{C/L/C Model}
+\label{c_l_c_model}
+
+\subsection{Single Particle Model}
+\label{single_particle_model}
 C/L/C model for lithium-ion batteries \cite{kazhamiaka2019tractable},
 DFN model vs. SPM model
