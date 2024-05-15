@@ -34,23 +34,33 @@ Following this, the next sections will present relevant frameworks for this work
 
 \subsection{The Mosaik Framework}
 \label{mosaik_framework}
-Mosaik \cite{mosaik} was designed to be used as a co-simulation framework to study scenarios in the area of the smart grid \cite{Smart-Grids}, which can, for instance, serve as testbeds for different control strategies in the smart grid. Nowadays, however, it can easily be used as a flexible co-simulator for various environments by combining different simulation units to create large-scale scenarios.
+Mosaik \cite{mosaik} was designed to be used as a co-simulation framework to study scenarios in the area of the smart grid \cite{Smart-Grids}, which can, for instance, serve as testbeds for different control strategies in said smart grid. Nowadays, however, it can easily be used as a flexible co-simulator for various environments by combining different simulation units to create large-scale scenarios.
 
 At its core, Mosaik is responsible for synchronizing processes that each run a simulation, and to manage data-flows between them. To achieve this, the framework encompasses four main components \footnote{These main components are listed in the Mosaik documentation under the following link: \url{https://mosaik.readthedocs.io/en/3.3.0/overview.html}}:
 \begin{itemize}
-    \item[] \textbf{Mosaik API:} Establishes a common protocol for communication between the Mosaik-core and the coupled simulators. While the low-level API is based on network sockets for the passing of JSON messages, there are also high-level APIs available for various programming languages, which provides an extra abstraction layer by handling the networking.
+    \item[] \textbf{Mosaik API:} Establishes a common protocol for communication between the Mosaik-core and the coupled simulators. While the low-level API is based on network sockets for the passing of JSON messages, there are also high-level APIs available for various programming languages, which provide an extra abstraction layer by handling the networking.
     \item[] \textbf{Scenario API:} Python API for creating simulation scenarios, which makes it possible to define data flows by connecting simulation units, and to execute these scenarios by starting the different simulation units. 
     \item[] \textbf{Simulation Manager:} Handles external simulator processes and communicates with them. They are internally represented by proxy objects so that it makes no difference to other Mosaik components if the simulators are in-process with the Mosaik-core, started by Mosaik itself, or if Mosaik simply connected to a running simulator instance.
-    \item[] \textbf{Mosaik Scheduler:} The discrete-event orchestrator of the co-simulation. It is responsible for stepping the simulators through time while keeping them synchronized, and the data passing of inputs and outputs between the simulation units. Mosaik allows these simulation units to be continuous-time based or hybrid by wrapping each of them in a discrete-event simulation unit.
+    \item[] \textbf{Mosaik Scheduler:} The discrete-event orchestrator of the co-simulation. It is responsible for stepping the simulators through time while keeping them synchronized, and the data passing of inputs and outputs between the simulation units. Mosaik allows these simulation units to be continuous-time based or hybrid by wrapping them in discrete-event simulation units.
 \end{itemize}
 
 \subsection{Vessim Infrastructure}
+With the goal of accelerating research in the area of sustainable computing, Wiesner et al. recently presented the Vessim Framework \cite{vessim}, which evolved in the last year to provide a co-simulation test environment for the development of carbon-aware applications and systems that interact with their energy system. It allows users to define individual microgrids to represent these energy systems of computing infrastructure like data centers, utilizing the described Mosaik framework under the hood. Thereby, each microgrid consists of multiple simulation units responsible for modeling generators, consumers, and energy storage as well as user-defined controllers, which can provide applications visibility and control over the energy system.
+
 \label{vessim_infrastructure}
 \begin{figure*}
     \includegraphics[width=\linewidth]{thesis/Images/Vessim_Infrastructure.pdf}
-    \caption{Vessim Infrastructure as described by Wiesner et al. \cite{vessim}.}
+    \caption{Microgrid co-simulation infrastructure as described by Wiesner et al. \cite{vessim}.}
     \label{fig:vessim_infrastructure}
 \end{figure*}
+
+The co-simulation infrastructure of a single microgrid, which is depicted in Figure \ref{fig:vessim_infrastructure}, consists of four distinct subsystems that are stepped in a specific order:
+\begin{enumerate}
+    \item \textbf{Actors:} The actors model the energy consumers and producers of the microgrid, and are characterized by their individual power trace $p^{<\text{actor}>}$. Every actor has its separate Mosaik simulation unit, which forwards the actor's power production ($p_t^{<\text{actor}>} > 0$) or power consumption ($p_t^{<\text{actor}>} < 0$) at every simulation step $t$. The actor models are highly variable as they can be everything from simulated nodes, which only read out historical traces of, for instance, solar irradiance or computation load, to nodes that monitor full on server farms, running hundreds of virtual machines where the power consumption is measured using power meters. Due to this high diversity, the actors also have the option to provide controllers with additional information to allow for better decision-making by transmitting their state ($\text{state}_t^{<\text{actor}>}$) to them.
+    \item  \textbf{Grid:} The Grid simulator is responsible to model the power flow inside the microgrid's power network. At every simulation step $t$, it gets the power trace of the actors as input, and produces a power delta $\Delta p_t$ that can be stored to or has to be discharged from the energy storage. To accurately model this power flow, frameworks like PyPSA \cite{brown2017pypsa} can be used, but for many cases, a simple aggregation $\Delta p_t = \sum{p_t^{<\text{actor}>}}$ is enough.
+    \item \textbf{Controllers:} Users can define custom controllers that can monitor and configure the energy and computing systems during the simulation. Controllers receive the entire state of the microgrid's energy system at every simulation step $t$. Next to the state of all the actors ($\text{state}_t^{<\text{actor}>}$) and the state of the energy storage ($\text{state}_t^{s}$), this also includes the current power delta ($\Delta p_t$) as well as the excess energy or energy deficit that the energy system had since the last time step ($e_{t-1}$). With all this information, which can also be extended by other signals like production and load forecasts, the controllers have the flexibility, next to monitoring, to also reduce consumption by throttling the computing system or tweak the energy storage configuration.
+    \item \textbf{Storage:}
+\end{enumerate}
 
 \section{Something bout battery modeling}
 C/L/C model for lithium-ion batteries \cite{kazhamiaka2019tractable},
