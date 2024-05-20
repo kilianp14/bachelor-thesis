@@ -66,12 +66,62 @@ This thesis aims to extend upon the Vessim approach by further specifying the st
 
 \section{Lithium-Ion Battery Models}
 \label{lithium_ion_battery_models}
+Battery modelling describes the process of creating mathematical representations of the behavior and characteristics of batteries to predict their performance under various conditions. This technique is essential for understanding and optimizing battery systems used in a wide range of applications, from consumer electronics to electric vehicles and renewable energy storage.
+
 This section presents a quick overview of relevant models of lithium-ion batteries that are applied in this thesis. Section \ref{c_l_c_model} discusses the C/L/C model as described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, and section \ref{single_particle_model} presents the single particle model for lithium-ion batteries.
 
 \subsection{C/L/C Model}
 \label{c_l_c_model}
+The C/L/C is a tractable implementation of the Power-based Integrated (PI) Model as proposed by Kazhamiaka et al. in 2018 \cite{kazhamiaka2018pimodel}, which tries to estimate the energy content of a lithium-ion battery cell. In the PI model, the battery consists of a Battery Management System (BMS) as well as lithium-ion cells, and the change of the battery system's energy level is modeled while the storage is being charged or discharged at varying power over time.
+
+In every time-step $t$, the PI model gets the applied power $p(t)$, the energy content of the previous time-step $b(t-1)$, as well as the duration of the time-step $d$ as inputs to compute the battery's energy $b(t)$. This is achieved by adding a specific energy delta (as shown in \ref{eq:2.1}), which depends on all these inputs \footnote{The equations for the PI model in this chapter are taken from the paper by Kazhamiaka et al. \cite{kazhamiaka2018pimodel}.}.
+
+\begin{equation}\label{eq:2.1}
+    b(t) = b(t-1) + \Delta_E(t)
+\end{equation}
+
+The mentioned energy delta of a step $t$ is computed by multiplying the applied power $p(t)$\footnote{$p(t) > 0$ indicates charging and $p(t) < 0$ indicates discharging.} times the duration $d$ and a (dis-)charging penalty, marking the power loss due to inefficiencies (see equation \ref{eq:2.2}). Thereby, $\eta_c(I, V)$ (charging inefficiency) describes a function representing the fraction of power stored in the battery while it is charged with a certain power $p$, while $\eta_d(I, V)$ (discharging inefficiency) stands for the function representing the fraction of power that has to be discharged from the battery to obtain the power $p$. Subsequently, $0 \le \eta_c(I, V) \le 1$ and $\eta_c(I, V) \ge 1$ hold true. Note that the charging and discharging inefficiencies are dependent on the battery's current $I(t)$, and the battery's voltage $V(t)$.
+
+\begin{equation}\label{eq:2.2}
+    \Delta_E(k) = \begin{dcases} \eta_c(I(t),V(t))\cdot p(t)\cdot d & \vert\: p(t) \ge 0\\ \eta_d(I(t),V(t))\cdot p(t)\cdot d & \vert\: p(t) < 0
+    \end{dcases}
+\end{equation}
+
+The PI model has an internal representation of a battery's terminal voltage $V$, which is computed at every time-step $t$. The voltage of the battery is described by a function $M$, which relates the battery's energy content $b(t)$ and the applied current $I(t)$ to its voltage, as presented in equation \ref{eq:2.3}. Typically, the terminal voltage rises when the battery is charged, and drops when it is discharged relative to its open-circuit voltage in idle state.
+
+\begin{equation}\label{eq:2.3}
+   V(t) = M(b(t), I(t)) 
+\end{equation}
+
+The relation between the battery's applied power $p$, its applied current $I$, and its terminal voltage $V$ at time-step $t$ yields the internal representation of the current function over time:
+
+\begin{equation} \label{eq:2.4}
+    I(t) = \frac{p(t)}{V(t)}
+\end{equation}
+
+The BMS attached to the batteries limits the charging and discharging currents to prevent overheating and degradation of components, which is done by adding the constraint \ref{eq:2.5} to the model. The parameters $\alpha_d$ (discharging current limit) and $\alpha_c$ (charging current limit) are constants that can normally be found on a battery model's specification sheet.
+
+\begin{equation} \label{eq:2.5}
+    \alpha_d \le I(t) \le \alpha_c \\
+\end{equation}
+
+Lastly, the PI model has another constraint regarding the battery's applied current. Because a battery's voltage should not exceed certain thresholds during charging or discharging to prevent damage, and that terminal voltage rises when charged with a higher current (or falls when discharged at a higher current), the energy that can be fed to or taken from the battery varies depending on the (dis-)charging current. Therefore, an energy content range is specified, where the BMS prevents the batteries from being discharged further than a lower energy content limit $a_1(I)$, or being charged further than an upper energy content limit $a_2(I)$. These limits mark the point where the voltage reaches its allowed minimum or maximum while being (dis-)charged. The following constraint is consequently added to the PI model:
+
+\begin{equation}
+    a_1(I(t)) \le b(t) \le a_2(I(t))
+\end{equation}
+
+Given this base model, Kazhamiaka et al. describes a set of tractable implementations in their 2019 paper \cite{kazhamiaka2019tractable}. The main issue is that the three principal components (the $M$ function for computation of internal voltage, the energy content limit functions $a_1$ and $a_2$, and the inefficiency functions $\eta_c$ and $\eta_d$) have no explicit mathematical representation or are non-linear, which makes mathematical optimization difficult.
+
+In these tractable models, these components are thus approximated with polynomials. The C/L/C model thereby uses the following approximations to retrieve a mathematical model for lithium-ion batteries:
+
+\begin{itemize}
+    \item \textbf{C}onstant approximation for the battery's terminal voltage. This could be, for instance, the nominal voltage which can be found in the specifications ($V(t) = V_{nom}$).
+    \item \textbf{L}inear approximation for the energy content limits depending on the current: $a_1(I(t)) = u_1I(t) + v_1$ and $a_2(I(t)) = u_2I(t) + v_2$
+    \item \textbf{C}onstant approximation for the battery's charging and discharging inefficiency: $\eta_d(I(t), V(t)) = \overline{\eta_d}$ and $\eta_c(I(t), V(t)) = \overline{\eta_c}$
+\end{itemize}
+
+All in all, the C/L/C model has linear complexity while offering a decent estimation of a battery's energy level over time. This model is also used by the Carbon Explorer framework \cite{acun2022holistic} to represent the present energy storage of data centers.
 
 \subsection{Single Particle Model}
 \label{single_particle_model}
-C/L/C model for lithium-ion batteries \cite{kazhamiaka2019tractable},
-DFN model vs. SPM model
