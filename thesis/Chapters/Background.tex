@@ -48,10 +48,10 @@ At its core, Mosaik is responsible for synchronizing processes that each run a s
 \label{vessim_infrastructure}
 With the goal of accelerating research in the area of sustainable computing, Wiesner et al. recently presented the Vessim Framework \cite{vessim}, which evolved in the last year to provide a co-simulation test environment for the development of carbon-aware applications and systems that interact with their power system. It allows users to define individual microgrids to represent these power systems of computing infrastructure like data centers, utilizing the described Mosaik framework under the hood. Thereby, each microgrid consists of multiple simulation units responsible for modeling generators, consumers, and energy storage as well as user-defined controllers, which can provide applications visibility and control over the power system.
 
-\label{fig:vessim_infrastructure}
-\begin{figure*}
+\begin{figure*}[t]
     \includegraphics[width=\linewidth]{thesis/Images/Vessim_Infrastructure.pdf}
-    \caption{Microgrid co-simulation infrastructure as described by Wiesner et al. \cite{vessim}.}
+    \caption{Microgrid co-simulation infrastructure as described by Wiesner et al. \cite{vessim}. Colored components mark Mosaik simulation units.}
+    \label{fig:vessim_infrastructure}
 \end{figure*}
 
 The co-simulation infrastructure of a single microgrid, which is depicted in Figure \ref{fig:vessim_infrastructure}, is defined using the Mosaik Scenario API, and the individual simulation units implement the high-level Python API of Mosaik. A Vessim microgrid consists of four distinct subsystems that are stepped in a specific order, whereas the Mosaik Scheduler handles data passing and synchronization.
@@ -66,9 +66,21 @@ This thesis aims to extend upon the Vessim approach by further specifying the st
 
 \section{Lithium-Ion Battery Models}
 \label{lithium_ion_battery_models}
-Battery modelling describes the process of creating mathematical representations of the behavior and characteristics of batteries to predict their performance under various conditions. This technique is essential for understanding and optimizing battery systems used in a wide range of applications, from consumer electronics to electric vehicles and renewable energy storage.
+Battery modelling describes the process of creating mathematical representations of the behavior and characteristics of batteries to predict their performance under various conditions. This technique is essential for understanding and optimizing battery systems used in a wide range of applications.
 
-This section presents a quick overview of relevant models of lithium-ion batteries that are applied in this thesis. Section \ref{c_l_c_model} discusses the C/L/C model as described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, and section \ref{single_particle_models} presents single particle models for lithium-ion batteries.
+Lithium-ion (Li-ion) batteries are commonly used in portable electronics, electric vehicles, and various other applications due to their energy density, long cycle life, and low self-discharge rate \cite{kim2019lithium, deng2015li}. They consist of a positive electrode (Cathode), a negative electrode (Anode), an electrolyte fluid, and a separator that prevents physical contact between the electrodes. A simplified structure of a lithium-ion battery is depicted in figure \ref{fig:lithium_ion_battery}.
+
+When an external voltage is applied to the battery during charging, it forces lithium ions from the cathode, which contains a lithium metal oxide, to move through the electrolyte to the anode, where it is inserted into graphite layers \cite{deng2015li}. The electrons released during the electrochemical reaction cannot pass through the electrolyte, and instead flow through the external circuit to balance the charge after being collected by a metal sheet.
+
+During discharging, the opposite process occurs, as electrons move through the external circuit to the cathode, inducing a current to be used by the load, while the lithium-ions pass the electrolyte to become once again part of the lithium-metal-oxide \cite{deng2015li}. Because the difference in electrical charge decreases over time, the terminal voltage of the battery falls as it empties.
+
+\begin{figure*}[t]
+    \includegraphics[width=\linewidth]{thesis/Images/Lithium_Ion_Battery.pdf}
+    \caption{Simplified representation of the internal structure of a lithium-ion battery.}
+    \label{fig:lithium_ion_battery}
+\end{figure*}
+
+The next subsections present a quick overview of relevant models of lithium-ion batteries that are applied in this thesis. Section \ref{c_l_c_model} discusses the C/L/C model as described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, and section \ref{single_particle_models} presents single particle models for lithium-ion batteries.
 
 \subsection{C/L/C Model}
 \label{c_l_c_model}
@@ -121,7 +133,7 @@ In the tractable models, these components are thus approximated with polynomials
     \item \textbf{C}onstant approximation for the battery's charging and discharging inefficiency: $\eta_d(I(t), V(t)) = \overline{\eta_d}$ and $\eta_c(I(t), V(t)) = \overline{\eta_c}$
 \end{itemize}
 
-All in all, the C/L/C model has linear complexity while offering a decent estimation of a battery's energy level over time. This model is also used by the Carbon Explorer framework \cite{acun2022holistic} to represent the present energy storage of data centers.
+All in all, the C/L/C model has linear complexity while offering a decent estimation of a battery's energy level over time, but it can be seen that the discussed electrochemical reactions in the battery are at no point considered. This model is, for instance, used by the Carbon Explorer framework \cite{acun2022holistic} to represent the present energy storage of data centers.
 
 \subsection{Single Particle Models}
 \label{single_particle_models}
@@ -129,8 +141,8 @@ The Doyle-Fuller-Newman (DFN) Model, which was developed in 1993 by Doyle et al.
 
 Single particle models (SPMs) are considered to be the least complex electrochemical models for lithium-ion batteries \cite{marquis2019spm, ramadesigan2012modeling}
 
-\label{fig:single_particle_model}
-\begin{figure*}
+\begin{figure*}[t]
     \includegraphics[width=\linewidth]{thesis/Images/Single_Particle_Model.pdf}
     \caption{Representation of a Single Particle Model with its submodels. The figure is adapted from Planella et al. \cite{planella2021systematic} with modifications.}
+    \label{fig:single_particle_model}
 \end{figure*}
