@@ -239,8 +239,7 @@ def setup_circuit(
 
     return netlist
 
-
-def solve_circuit_vectorized(netlist):
+def solve_circuit_vectorized(netlist, power=None):
     """
     Generate and solve the Modified Nodal Analysis (MNA) equations for the circuit.
     The MNA equations are a linear system Ax = z.
@@ -249,6 +248,9 @@ def solve_circuit_vectorized(netlist):
     Args:
         netlist (pandas.DataFrame):
             A netlist of circuit elements with format desc, node1, node2, value.
+        power (float)
+            A value for the power of the pack. If not none then replaces the
+            current value in the netlist and solves for power iteratively.
 
     Returns:
         V_node (np.ndarray):
@@ -337,15 +339,6 @@ def solve_circuit_vectorized(netlist):
     B[n1, vsCnt[V_map_not_n1_ground]] = 1
     B[n2, vsCnt[V_map_not_n2_ground]] = -1
     e[np.arange(m), 0] = value[V_map]
-    # Current Sources
-    I_map = desc == "I"
-    n1 = node1[I_map]
-    n2 = node2[I_map]
-    # Current elements: fill the i vector only
-    if n1 >= 0:
-        i[n1] = i[n1] - value[I_map]
-    if n2 >= 0:
-        i[n2] = i[n2] + value[I_map]
 
     # Construct final matrices from sub-matrices
     upper = sp.sparse.hstack((G, B))
@@ -354,17 +347,61 @@ def solve_circuit_vectorized(netlist):
     # Convert a to csr sparse format for more efficient solving of the linear system
     # csr works slighhtly more robustly than csc
     A_csr = sp.sparse.csr_matrix(A)
-    z = np.vstack((i, e))
 
-    # Scipy
-    X = sp.sparse.linalg.spsolve(A_csr, z).flatten()
+    # Current Sources
+    I_map = desc == "I"
+    n1 = node1[I_map]
+    n2 = node2[I_map]
 
-    # include ground node (0V)
-    # it is counter-intuitive that z is [i,e] while X is [V,I], but this is correct
-    V_node = np.zeros(n + 1)
-    V_node[1:] = X[:n]
-    I_batt = X[n:]
+    def _solve(A_csr, z, n):
+        # Scipy
+        X = sp.sparse.linalg.spsolve(A_csr, z).flatten()
 
+        # include ground node (0V)
+        # it is counter-intuitive that z is [i,e] while X is [V,I], but this is correct
+        V_node = np.zeros(n + 1)
+        V_node[1:] = X[:n]
+        I_batt = X[n:]
+        return V_node, I_batt
+
+    if power is None:
+        # Current elements: fill the i vector only
+        if n1 >= 0:
+            i[n1] = i[n1] - value[I_map]
+        if n2 >= 0:
+            i[n2] = i[n2] + value[I_map]
+
+        z = np.vstack((i, e))
+        V_node, I_batt = _solve(A_csr, z, n)
+
+    else:
+        Terminal_Node = np.array(netlist[I_map].node1)
+        # Initialize current guess
+        current_guess = value[I_map]
+        max_iterations = 10
+        iteration = 0
+        tolerance = 0.001
+        # Iterate to find the current that results in the desired power
+        while iteration < max_iterations:
+            i = np.zeros([n, 1])
+            # Current elements: fill the i vector only
+            if n1 >= 0:
+                i[n1] = i[n1] - current_guess
+            if n2 >= 0:
+                i[n2] = i[n2] + current_guess
+
+            z = np.vstack((i, e))
+            V_node, I_batt = _solve(A_csr, z, n)
+            V_Terminal = V_node[Terminal_Node]
+            power_guess = V_Terminal * current_guess
+            # Check if the power is within the tolerance
+            if abs(power_guess - power) < tolerance:
+                break
+            # Adjust the current guess based on the power difference
+            current_adjustment = (power - power_guess) / V_Terminal
+            current_guess += current_adjustment
+            iteration += 1
+        netlist.loc[I_map, ("value")] = current_guess
 
     return V_node, I_batt
 

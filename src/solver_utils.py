@@ -1,6 +1,8 @@
 import casadi
 import pybamm
 import numpy as np
+import pybamm
+from typing import Optional
 
 
 def serial_eval(model, solutions, inputs_dict, variables):
@@ -146,7 +148,6 @@ def create_casadi_objects(inputs, sim, dt, variable_names):
     """
     solver = sim.solver
     # Initial solution - this builds the model behind the scenes
-    sim.build()
     initial_solutions = []
     init_sol = sim.step(
         dt=1e-6, save=False, starting_solution=None, inputs=inputs[0]
@@ -244,56 +245,52 @@ def build_inputs_dict(I_batt):
     return dicts
 
 
-def setup_basic_simulation(parameter_values, initial_soc):
-    """
-    Update initial concentration parameters
-
-    Args:
-        param (pybamm.ParameterValues):
-            The battery simulation parameters.
-        SoC (float):
-            Target initial SoC. Must be between 0 and 1. Default is -1, in which
-            case the initial concentrations are set using the target OCV.
-
-    Returns:
-        sim (pybamm.Simulation):
-            A simulation that can be solved individually or passed into the
-            liionpack solve method
-    """
-    if np.any(initial_soc < 0) or np.any(initial_soc > 1):
-        raise ValueError("Initial SOC should be between 0 and 1")
-
-    c_n_max = parameter_values["Maximum concentration in negative electrode [mol.m-3]"]
-    c_p_max = parameter_values["Maximum concentration in positive electrode [mol.m-3]"]
-
-    param = pybamm.LithiumIonParameters()
-    esoh_solver = pybamm.lithium_ion.ElectrodeSOHSolver(parameter_values, param)
-    x, y =  esoh_solver.get_initial_stoichiometries(initial_soc)
-
-    if x is not None:
-        c_s_n_init, c_s_p_init = x * c_n_max, y * c_p_max
-    parameter_values.update(
-        {
-            "Initial concentration in negative electrode [mol.m-3]": c_s_n_init,
-            "Initial concentration in positive electrode [mol.m-3]": c_s_p_init,
-        }
+def setup_basic_simulation(
+        model: pybamm.lithium_ion.BaseModel,
+        parameter_values: pybamm.ParameterValues,
+        initial_soc: float = 0,
+        geometry: Optional[pybamm.Geometry] = None,
+        submesh_types: Optional[dict] = None,
+        var_pts: Optional[dict] = None,
+        spatial_methods: Optional[dict] = None,
+        solver: Optional[pybamm.BaseSolver] = None,
+    ):
+    # Get data for state-of-charge estimation
+    experiment = pybamm.Experiment(
+        [
+            (
+                f"Charge at 1W until {parameter_values['Upper voltage cut-off [V]']}V",
+            )
+        ],
+        period="1 second"
     )
-
-    # Create the pybamm model
-    model = pybamm.lithium_ion.SPM()
-
-    # Add events to the model
-    for event in model.events:
-        model.variables.update({"Event: " + event.name: event.expression})
-
-    # Set up parameter values
-    param = parameter_values.copy()
-
-    # Set up solver and simulation
-    solver = pybamm.CasadiSolver(mode="safe")
-    sim = pybamm.Simulation(
+    soc_sim = pybamm.Simulation(
         model=model,
-        parameter_values=param,
+        experiment=experiment,
+        geometry=geometry,
+        parameter_values=parameter_values,
+        submesh_types=submesh_types,
+        var_pts=var_pts,
+        spatial_methods=spatial_methods,
         solver=solver,
     )
-    return sim
+    sol = soc_sim.solve(initial_soc=0)
+    ocv_values = sol['Surface open-circuit voltage [V]'].data
+    soc_values = np.linspace(0.0, 1.0, ocv_values.size)
+
+    sim = pybamm.Simulation(
+        model=model,
+        geometry=geometry,
+        parameter_values=parameter_values,
+        submesh_types=submesh_types,
+        var_pts=var_pts,
+        spatial_methods=spatial_methods,
+        solver=solver,
+    )
+    # Bugs sometimes if initial soc is 0 or 1
+    if initial_soc > 0.99:
+        initial_soc = 0.99
+    if initial_soc < 0.01:
+        initial_soc = 0.01
+    sim.build(initial_soc=initial_soc)
+    return sim, ocv_values, soc_values
