@@ -1,0 +1,19 @@
+The objective of this thesis is to investigate, how different energy storage models can be integrated into a microgrid co-simulation, which can simulate the energy system infrastructure of a data center. These models can range from simple, lossless batteries with the sole purpose of transferring usable energy over the duration of a simulation, to complex models of entire battery packs that take the internal physical processes of batteries as well as the energy losses of the battery packs circuit into account.
+
+In addition to that, this work also proposes, how the important task of energy management in a microgrid environment can be simulated. This energy management can, for instance, include the charging and discharging of the microgrid's energy storage, the exchange of energy with the public utility grid, but also curtailment if there happens to be unusable excess energy.
+
+The aim is to achieve this by extending the already existing co-simulation infrastructure of the Vessim framework \cite{vessim}, which has already been described in detail in section \ref{vessim_infrastructure}. Thereby, mainly the storage simulation unit is refined and explained in detail so that the described objectives can be met, and the infrastructure can be used as a co-simulation testbed for data centers. 
+
+This chapter starts by outlining the used interface for the microgrid's energy storage in section \ref{energy_storage_interface}, which will be used to model battery packs at multiple levels of complexity. In section \ref{energy_management_policies}, it is discussed, how policies are defined, which are used to balance the energy within the microgrid at every time-step, and thus performing the necessary energy management. Finally, section \ref{extended_co-simulation_infrastructure} describes, how these components are integrated into the Vessim infrastructure, and how the energy and battery management can be tweaked during the simulation runtime.
+
+\section{Energy Storage Interface}
+\label{energy_storage_interface}
+
+\section{Energy Management Policies}
+\label{energy_management_policies}
+In the context of microgrid co-simulation, energy management is a critical part, as it has to be defined, how the microgrid responds to specific power deltas, which refer to the variations in power supply and demand. For this purpose, the approach allows for a user-defined \textit{MicrogridPolicy}, which provides a structured way to deal with these power fluctuations, whereas the management includes interactions with the public grid and present energy storage systems as well as curtailment.
+
+The policy lets users define custom rules and strategies that balance the power delta of the microgrid's generators and consumers at every time-step. In case of excess power during the time-step, energy has to be stored, fed back to the utility grid, or curtailed, while a lack of power has to be leveled using either grid energy or the energy received by discharging the energy storage. These rules are applied at every time-step based on the current power delta and the duration that the delta is valid for.
+
+\section{Extended Co-Simulation Infrastructure}
+\label{extended_co-simulation_infrastructure}
