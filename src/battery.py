@@ -34,17 +34,17 @@ class CLCBattery(vs.Storage):
     def __init__(
         self,
         number_of_cells: int = 1,
-        cell_capacity: float = 18.2,
+        cell_capacity: float = 19.054,
         initial_soc: float = 0,
         min_soc: float = 0,
         nom_voltage: float = 3.63,
         alpha_d: float = 3.0,
         alpha_c: float = 0.7,
-        eta_d: float = 1.043,
-        eta_c: float = 0.979,
-        u_1: float = 0.069,
+        eta_d: float = 1.011,
+        eta_c: float = 0.983,
+        u_1: float = 0.010,
         v_1: float = 0.0,
-        u_2: float = -0.081,
+        u_2: float = -0.195,
         v_2: float = 1.0,
     ) -> None:
         assert number_of_cells > 0, "There has to be a positive number of cells."
@@ -142,6 +142,8 @@ class PybammBattery(vs.Storage):
     ) -> None:
         parameter_values = parameter_values if parameter_values else model.default_parameter_values
         parameter_values.update({"Power function [W]": "[input]"}, check_already_exists=False)
+        self.v_cut_lower = parameter_values["Lower voltage cut-off [V]"]
+        self.v_cut_higher = parameter_values["Upper voltage cut-off [V]"]
         assert number_of_cells > 0, "There has to be a positive number of cells."
         self.number_of_cells = number_of_cells
 
@@ -163,7 +165,7 @@ class PybammBattery(vs.Storage):
         idx = np.searchsorted(self._ocv_values, value, side='right')
         if idx == 0:
             return 0.0
-        elif idx == self._ocv_values.size:
+        elif idx == len(self._ocv_values):
             return 1.0
         else:
             x1, x2 = self._ocv_values[idx - 1], self._ocv_values[idx]
@@ -171,6 +173,14 @@ class PybammBattery(vs.Storage):
             return y1 + (value - x1) * (y2 - y1) / (x2 - x1)
 
     def update(self, power: float, duration: int) -> float:
+        # Check if voltage limits are reached
+        temp_v = self.cell_solution["Voltage [V]"].data[0]
+        if np.allclose(temp_v, self.v_cut_lower) and power <= 0:
+            # Can not discharge further
+            return 0.0
+        if np.allclose(temp_v, self.v_cut_higher) and power >= 0:
+            # Can not charge further
+            return 0.0
         self.cell_solution = self.sim.step(duration, inputs={"Power function [W]": - power / self.number_of_cells}).last_state
         return power * duration
 
@@ -260,7 +270,7 @@ class LiionBatteryPack(vs.Storage):
             idx = np.searchsorted(self._ocv_values, value, side='right')
             if idx == 0:
                 soc += 0.0
-            elif idx == self._ocv_values.size:
+            elif idx == len(self._ocv_values):
                 soc += 1.0
             else:
                 x1, x2 = self._ocv_values[idx - 1], self._ocv_values[idx]
@@ -285,6 +295,13 @@ class LiionBatteryPack(vs.Storage):
         # Get the ocv and internal resistance
         temp_v = self.output[0,:]
         temp_ocv = self.output[1,:]
+        # Check if voltage limits are reached
+        if np.any(temp_v < self.v_cut_lower) and power <= 0:
+            # Can not discharge further
+            return 0.0
+        if np.any(temp_v > self.v_cut_higher) and power >= 0:
+            # Can not charge further
+            return 0.0
         # When resting and rebalancing currents are small the internal
         # resistance calculation can diverge as it's R = V / I
         # At rest the internal resistance should not change greatly
@@ -302,11 +319,6 @@ class LiionBatteryPack(vs.Storage):
         I_app = I_batt[:] * -1
         self.shm_i_app[:] = I_app.astype(np.float32)
         self.inputs_dict = build_inputs_dict(I_app)
-        # Check if voltage limits are reached and terminate
-        if np.any(temp_v < self.v_cut_lower):
-            raise RuntimeError("Low voltage limit reached")
-        if np.any(temp_v > self.v_cut_higher):
-            raise RuntimeError("High voltage limit reached")
         # Step the electrochemical system
         events = self.actor.step(self.inputs_dict)
         if events:
