@@ -246,37 +246,59 @@ def build_inputs_dict(I_batt):
 
 
 def setup_basic_simulation(
-        model: pybamm.lithium_ion.BaseModel,
-        parameter_values: pybamm.ParameterValues,
-        initial_soc: float = 0,
-        geometry: Optional[pybamm.Geometry] = None,
-        submesh_types: Optional[dict] = None,
-        var_pts: Optional[dict] = None,
-        spatial_methods: Optional[dict] = None,
-        solver: Optional[pybamm.BaseSolver] = None,
-    ):
+    model: pybamm.lithium_ion.BaseModel,
+    parameter_values: pybamm.ParameterValues,
+    initial_soc: float = 0,
+    geometry: Optional[pybamm.Geometry] = None,
+    submesh_types: Optional[dict] = None,
+    var_pts: Optional[dict] = None,
+    spatial_methods: Optional[dict] = None,
+    solver: Optional[pybamm.BaseSolver] = None,
+):
     # Get data for state-of-charge estimation
-    experiment = pybamm.Experiment(
-        [
-            (
-                f"Charge at 1W until {parameter_values['Upper voltage cut-off [V]']}V",
-            )
-        ],
-        period="1 second"
-    )
-    soc_sim = pybamm.Simulation(
-        model=model,
-        experiment=experiment,
-        geometry=geometry,
-        parameter_values=parameter_values,
-        submesh_types=submesh_types,
-        var_pts=var_pts,
-        spatial_methods=spatial_methods,
-        solver=solver,
-    )
-    sol = soc_sim.solve(initial_soc=0)
-    ocv_values = sol['Surface open-circuit voltage [V]'].data
-    soc_values = np.linspace(0.0, 1.0, ocv_values.size)
+    ocv_values = [parameter_values["Lower voltage cut-off [V]"]]
+    soc_values = [0.0]
+    for i in np.arange(0.01, 1, 0.01):
+        soc_sim = pybamm.Simulation(
+            model=model,
+            geometry=geometry,
+            parameter_values=parameter_values,
+            submesh_types=submesh_types,
+            var_pts=var_pts,
+            spatial_methods=spatial_methods,
+            solver=solver,
+        )
+        soc_sim.build(initial_soc=i)
+        if parameter_values["Current function [A]"].__class__ is pybamm.InputParameter:
+            sol = soc_sim.step(dt=1e-6, inputs={"Current function [A]": 0.0}).last_state
+        else:
+            sol = soc_sim.step(dt=1e-6, inputs={"Power function [W]": 0.0}).last_state
+        soc_values.append(i)
+        ocv_values.append(sol["Surface open-circuit voltage [V]"].data[-1])
+    ocv_values.append(parameter_values["Upper voltage cut-off [V]"])
+    soc_values.append(1.0)
+
+    #experiment = pybamm.Experiment(
+        #[
+            #(
+                #f"Charge at 1W until {parameter_values['Upper voltage cut-off [V]']}V",
+            #)
+        #],
+        #period="1 second"
+    #)
+    #soc_sim = pybamm.Simulation(
+        #model=model,
+        #experiment=experiment,
+        #geometry=geometry,
+        #parameter_values=parameter_values,
+        #submesh_types=submesh_types,
+        #var_pts=var_pts,
+        #spatial_methods=spatial_methods,
+        #solver=solver,
+    #)
+    #sol = soc_sim.solve(initial_soc=0)
+    #ocv_values = sol['Surface open-circuit voltage [V]'].data
+    #soc_values = np.linspace(0.0, 1.0, ocv_values.size)
 
     sim = pybamm.Simulation(
         model=model,
@@ -288,9 +310,9 @@ def setup_basic_simulation(
         solver=solver,
     )
     # Bugs sometimes if initial soc is 0 or 1
-    if initial_soc > 0.99:
-        initial_soc = 0.99
-    if initial_soc < 0.01:
-        initial_soc = 0.01
+    if initial_soc > 0.999:
+        initial_soc = 0.999
+    if initial_soc < 0.001:
+        initial_soc = 0.001
     sim.build(initial_soc=initial_soc)
     return sim, ocv_values, soc_values
