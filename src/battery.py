@@ -13,38 +13,37 @@ class CLCBattery(vs.Storage):
     """CLC Battery model for lithium-ion batteries. Default is the LGM50 21700 parameterization.
 
     Args:
-        cell_capacity: Single cell battery capacity in Wh. Default is 18.2Wh.
+        cell_capacity: Single cell battery capacity in Wh. Default is 19.065Wh.
         initial_soc: Initial battery state-of-charge. Has to be between 0 and 1. Defaults to 0.
         nom_voltage: Single cell nominal voltage in V. Defaults to 3.63V.
-        alpha_d: Maximum discharging C-rate. Defaults to 3.0C.
+        alpha_d: Maximum discharging C-rate. Defaults to 1.5C.
         alpha_c: Maximum charging C-rate. Defaults to 0.7C.
         eta_d: Average fraction of power that has to be discharged from battery to obtain said
-            power. Is equivalent to the discharging inefficiency. Defaults to 1.043.
+            power. Is equivalent to the discharging inefficiency. Defaults to 1.014.
         eta_c: Average fraction of power that is stored in battery when charged at said power.
-            Is equivalent to the charging inefficiency. Defualts to 0.979.
+            Is equivalent to the charging inefficiency. Defualts to 0.978.
         u_1: Linear factor for the lower state-of-charge limit depending on the applied discharge
-            rate. Defaults to 0.069.
-        v_1: Offset for the lower state-of-charge limit depending on the applied discharge rate.
+            current. Defaults to 0.002.
+        v_1: Offset for the lower state-of-charge limit depending on the applied discharge current.
             Defaults to 0.0.
         u_2: Linear factor for the upper state-of-charge limit depending on the applied charge
-            rate. Defaults to -0.081.
-        v_2: Offset for the upper state-of-charge limit depending on the applied charge rate.
+            current. Defaults to -0.036.
+        v_2: Offset for the upper state-of-charge limit depending on the applied charge current.
             Defaults to 1.
     """
     def __init__(
         self,
         number_of_cells: int = 1,
-        cell_capacity: float = 19.054,
+        cell_capacity: float = 19.065,
         initial_soc: float = 0,
-        min_soc: float = 0,
         nom_voltage: float = 3.63,
-        alpha_d: float = 3.0,
+        alpha_d: float = 1.5,
         alpha_c: float = 0.7,
-        eta_d: float = 1.011,
-        eta_c: float = 0.983,
-        u_1: float = 0.010,
+        eta_d: float = 1.014,
+        eta_c: float = 0.978,
+        u_1: float = 0.002,
         v_1: float = 0.0,
-        u_2: float = -0.195,
+        u_2: float = -0.036,
         v_2: float = 1.0,
     ) -> None:
         assert number_of_cells > 0, "There has to be a positive number of cells."
@@ -52,17 +51,16 @@ class CLCBattery(vs.Storage):
         self.cell_capacity = cell_capacity # Wh
         assert 0 <= initial_soc <= 1, "Invalid initial state-of-charge. Has to be between 0 and 1."
         self.charge_level = cell_capacity * initial_soc # Wh
-        self.min_soc = min_soc
         self.nom_voltage = nom_voltage # V
         capacity = self.cell_capacity / self.nom_voltage # A
         self.alpha_d = - alpha_d * capacity # C-Rate to A
         self.alpha_c = alpha_c * capacity # C-Rate to A
         self.eta_d = eta_d
         self.eta_c = eta_c
-        self.u_1 = u_1 * self.nom_voltage # C-Rate at SoC -> A at Wh
-        self.v_1 = v_1 * self.cell_capacity # C-Rate at SoC -> A at Wh
-        self.u_2 = u_2 * self.nom_voltage # C-Rate at SoC -> A at Wh
-        self.v_2 = v_2 * self.cell_capacity # C-Rate at SoC -> A at Wh
+        self.u_1 = u_1 * self.cell_capacity # A at SoC -> A at Wh
+        self.v_1 = v_1 * self.cell_capacity # A at SoC -> A at Wh
+        self.u_2 = u_2 * self.cell_capacity # A at SoC -> A at Wh
+        self.v_2 = v_2 * self.cell_capacity # A at SoC -> A at Wh
 
     def soc(self) -> float:
         return self.charge_level / self.cell_capacity
@@ -80,49 +78,31 @@ class CLCBattery(vs.Storage):
             applied_power = current * self.nom_voltage
 
         if applied_power > 0:
-            return self.charge(applied_power, current, duration)
+            return self.charge(applied_power, duration)
         elif applied_power < 0:
-            return self.discharge(applied_power, current, duration)
+            return self.discharge(applied_power, duration)
         else:
             return 0
 
-    def charge(self, power: float, current: float, duration: int) -> float:
-        energy_limit = self.u_2 * current / self.number_of_cells + self.v_2
-        maximum_duration = (
-            (energy_limit - self.charge_level) * self.number_of_cells * 3600 / (self.eta_c * power)
-        )
-        if maximum_duration < 0:
-            return 0
-        elif maximum_duration < duration:
-            applied_duration = maximum_duration
-        else:
-            applied_duration = duration
-        self.charge_level += self.eta_c * power * applied_duration / (self.number_of_cells * 3600)
-        return power * applied_duration
+    def charge(self, power: float, duration: int) -> float:
+        max_power = (self.charge_level - self.v_2) / (self.u_2  / self.nom_voltage - duration * self.eta_c / 3600) * self.number_of_cells
+        if power > max_power:
+            power = max_power
+        self.charge_level += self.eta_c * power * duration / (self.number_of_cells * 3600)
+        return power * duration
 
-    def discharge(self, power: float, current: float, duration: int) -> float:
-        energy_limit = np.maximum(
-            self.u_1 * (-current) / self.number_of_cells + self.v_1,
-            self.min_soc * self.cell_capacity,
-        )
-        maximum_duration = (
-            (energy_limit - self.charge_level) * self.number_of_cells * 3600 / (self.eta_d * power)
-        )
-        if maximum_duration < 0:
-            return 0
-        elif maximum_duration < duration:
-            applied_duration = maximum_duration
-        else:
-            applied_duration = duration
-        self.charge_level += self.eta_d * power * applied_duration / (self.number_of_cells * 3600)
-        return power * applied_duration
+    def discharge(self, power: float, duration: int) -> float:
+        min_power = -(self.charge_level - self.v_1) / (self.u_1  / self.nom_voltage - duration * self.eta_d / 3600) * self.number_of_cells
+        if power < min_power:
+            power = min_power
+        self.charge_level += self.eta_d * power * duration / (self.number_of_cells * 3600)
+        return power * duration
 
     def state(self) -> dict:
         return {
             "soc": self.soc(),
             "charge_level": self.charge_level * self.number_of_cells,
             "capacity": self.cell_capacity * self.number_of_cells,
-            "min_soc": self.min_soc,
         }
 
 
@@ -177,10 +157,10 @@ class PybammBattery(vs.Storage):
         temp_v = self.cell_solution["Voltage [V]"].data[0]
         if np.allclose(temp_v, self.v_cut_lower) and power <= 0:
             # Can not discharge further
-            return 0.0
-        if np.allclose(temp_v, self.v_cut_higher) and power >= 0:
+            power = 0.0
+        if temp_v > self.v_cut_higher - 0.01 and power >= 0:
             # Can not charge further
-            return 0.0
+            power = 0.0
         self.cell_solution = self.sim.step(duration, inputs={"Power function [W]": - power / self.number_of_cells}).last_state
         return power * duration
 
@@ -289,19 +269,19 @@ class LiionBatteryPack(vs.Storage):
         return state
     
     def update(self, power, duration):
-        # Calculate whether resting or restarting
-        self.resting = power == 0.0 and self.last_power == 0.0
-        self.restarting = power != 0.0 and self.last_power == 0.0
         # Get the ocv and internal resistance
         temp_v = self.output[0,:]
         temp_ocv = self.output[1,:]
         # Check if voltage limits are reached
         if np.any(temp_v < self.v_cut_lower) and power <= 0:
             # Can not discharge further
-            return 0.0
+            power = 0.0
         if np.any(temp_v > self.v_cut_higher) and power >= 0:
             # Can not charge further
-            return 0.0
+            power = 0.0
+        # Calculate whether resting or restarting
+        self.resting = power == 0.0 and self.last_power == 0.0
+        self.restarting = power != 0.0 and self.last_power == 0.0
         # When resting and rebalancing currents are small the internal
         # resistance calculation can diverge as it's R = V / I
         # At rest the internal resistance should not change greatly
