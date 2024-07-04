@@ -30,6 +30,8 @@ class CLCBattery(vs.Storage):
             current. Defaults to -0.036.
         v_2: Offset for the upper state-of-charge limit depending on the applied charge current.
             Defaults to 1.
+        lowest_charging_current: Current at which charging is stopped. Defaults to 0.05A.
+        lowest_discharging_current: Current at which discharging is stopped. Defaults to 0.05A.
     """
     def __init__(
         self,
@@ -45,6 +47,8 @@ class CLCBattery(vs.Storage):
         v_1: float = 0.0,
         u_2: float = -0.036,
         v_2: float = 1.0,
+        lowest_charging_current: float = 0.05,
+        lowest_discharging_current: float = 0.05,
     ) -> None:
         assert number_of_cells > 0, "There has to be a positive number of cells."
         self.number_of_cells = number_of_cells
@@ -61,6 +65,8 @@ class CLCBattery(vs.Storage):
         self.v_1 = v_1 * self.cell_capacity # A at SoC -> A at Wh
         self.u_2 = u_2 * self.cell_capacity # A at SoC -> A at Wh
         self.v_2 = v_2 * self.cell_capacity # A at SoC -> A at Wh
+        self.lowest_charging_power = lowest_charging_current * self.nom_voltage
+        self.lowest_discharging_power = - lowest_discharging_current * self.nom_voltage
 
     def soc(self) -> float:
         return self.charge_level / self.cell_capacity
@@ -88,6 +94,8 @@ class CLCBattery(vs.Storage):
         max_power = (self.charge_level - self.v_2) / (self.u_2  / self.nom_voltage - duration * self.eta_c / 3600) * self.number_of_cells
         if power > max_power:
             power = max_power
+        if power < self.lowest_charging_power:
+            power = 0.0
         self.charge_level += self.eta_c * power * duration / (self.number_of_cells * 3600)
         return power * duration
 
@@ -95,6 +103,8 @@ class CLCBattery(vs.Storage):
         min_power = -(self.charge_level - self.v_1) / (self.u_1  / self.nom_voltage - duration * self.eta_d / 3600) * self.number_of_cells
         if power < min_power:
             power = min_power
+        if power > self.lowest_discharging_power:
+            power = 0.0
         self.charge_level += self.eta_d * power * duration / (self.number_of_cells * 3600)
         return power * duration
 
@@ -109,7 +119,8 @@ class CLCBattery(vs.Storage):
 class PybammBattery(vs.Storage):
     def __init__(
         self,
-        model: pybamm.lithium_ion.BaseModel,
+        model_type: type[pybamm.lithium_ion.BaseModel],
+        options: Optional[dict] = None,
         initial_soc: float = 0,
         number_of_cells: int = 1,
         geometry: Optional[pybamm.Geometry] = None,
@@ -119,9 +130,12 @@ class PybammBattery(vs.Storage):
         spatial_methods: Optional[dict] = None,
         solver: Optional[pybamm.BaseSolver] = None,
         output_variables: Optional[list] = None,
+        max_charge_rate: float = 0.7,
+        max_discharge_rate: float = 1.5,
+        min_charge_current: float = 0.05,
+        min_discharge_current: float = 0.05,
     ) -> None:
-        parameter_values = parameter_values if parameter_values else model.default_parameter_values
-        parameter_values.update({"Power function [W]": "[input]"}, check_already_exists=False)
+        parameter_values = parameter_values if parameter_values else model_type().default_parameter_values
         self.v_cut_lower = parameter_values["Lower voltage cut-off [V]"]
         self.v_cut_higher = parameter_values["Upper voltage cut-off [V]"]
         assert number_of_cells > 0, "There has to be a positive number of cells."
@@ -133,10 +147,60 @@ class PybammBattery(vs.Storage):
                 if out not in self.variable_names:
                     self.variable_names.append(out)
 
-        self.sim, self._ocv_values, self._soc_values = setup_basic_simulation(
-            model, parameter_values, initial_soc=initial_soc, geometry=geometry, submesh_types=submesh_types, var_pts=var_pts, spatial_methods=spatial_methods, solver=solver
+        experiment = pybamm.Experiment(
+            [
+                (
+                    f"Charge at {max_charge_rate}C until {self.v_cut_higher - 0.005}V",
+                    f"Hold at {self.v_cut_higher - 0.005}V until {min_charge_current}A"
+                )
+            ],
+            period = "1 second",
         )
+        charging_sim = pybamm.Simulation(
+            experiment=experiment,
+            model=model_type(),
+            geometry=geometry,
+            parameter_values=parameter_values.copy(),
+            submesh_types=submesh_types,
+            var_pts=var_pts,
+            spatial_methods=spatial_methods,
+            solver=solver,
+        )
+        sol = charging_sim.solve(initial_soc=0)
+        self._ocv_charging = sol["Surface open-circuit voltage [V]"].data
+        self._max_power_charging = - sol["Power [W]"].data
 
+        experiment = pybamm.Experiment(
+            [
+                (
+                    f"Discharge at {max_discharge_rate}C until {self.v_cut_lower + 0.01}V",
+                    f"Hold at {self.v_cut_lower + 0.01}V until {min_discharge_current}A"
+                )
+            ],
+            period = "1 second",
+        )
+        discharging_sim = pybamm.Simulation(
+            experiment=experiment,
+            model=model_type(),
+            geometry=geometry,
+            parameter_values=parameter_values.copy(),
+            submesh_types=submesh_types,
+            var_pts=var_pts,
+            spatial_methods=spatial_methods,
+            solver=solver,
+        )
+        sol = discharging_sim.solve(initial_soc=1)
+        self._ocv_discharging = sol["Surface open-circuit voltage [V]"].data[::-1]
+        self._max_power_discharging = sol["Power [W]"].data[::-1]
+
+        parameter_values.update({"Power function [W]": "[input]"}, check_already_exists=False)
+        if not options:
+            options = {"operating mode": "power"}
+        else:
+            options["operating mode"] = "power"
+        self.sim, self._ocv_values, self._soc_values = setup_basic_simulation(
+            model_type(options), parameter_values, initial_soc=initial_soc, geometry=geometry, submesh_types=submesh_types, var_pts=var_pts, spatial_methods=spatial_methods, solver=solver
+        )
         # Get initial solution
         self.cell_solution = self.sim.step(dt=1e-6, inputs={"Power function [W]": 0.0}).last_state
 
@@ -153,14 +217,19 @@ class PybammBattery(vs.Storage):
             return y1 + (value - x1) * (y2 - y1) / (x2 - x1)
 
     def update(self, power: float, duration: int) -> float:
-        # Check if voltage limits are reached
-        temp_v = self.cell_solution["Voltage [V]"].data[0]
-        if np.allclose(temp_v, self.v_cut_lower) and power <= 0:
-            # Can not discharge further
-            power = 0.0
-        if temp_v > self.v_cut_higher - 0.01 and power >= 0:
-            # Can not charge further
-            power = 0.0
+        value = self.cell_solution['Surface open-circuit voltage [V]'].data[0]
+        if power > 0.0:
+            idx = np.searchsorted(self._ocv_charging, value, side="right")
+            if idx == len(self._ocv_charging):
+                power = 0.0
+            elif power > self._max_power_charging[idx] * self.number_of_cells:
+                power = self._max_power_charging[idx] * self.number_of_cells
+        elif power < 0.0:
+            idx = np.searchsorted(self._ocv_discharging, value, side="left")
+            if idx == 0:
+                power = 0.0
+            elif power < - self._max_power_discharging[idx] * self.number_of_cells:
+                power = - self._max_power_discharging[idx] * self.number_of_cells
         self.cell_solution = self.sim.step(duration, inputs={"Power function [W]": - power / self.number_of_cells}).last_state
         return power * duration
 
