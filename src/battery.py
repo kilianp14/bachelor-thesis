@@ -3,6 +3,7 @@ from typing import Optional
 
 import pybamm
 import numpy as np
+import pandas as pd
 import vessim as vs
 
 from solver_utils import create_casadi_objects, serial_step, serial_eval, setup_basic_simulation, build_inputs_dict
@@ -243,9 +244,10 @@ class PybammBattery(vs.Storage):
 class LiionBatteryPack(vs.Storage):
     def __init__(
         self,
-        model: pybamm.lithium_ion.BaseModel,
-        netlist,
-        step_size,
+        model_type: type[pybamm.lithium_ion.BaseModel],
+        netlist: pd.DataFrame,
+        step_size: int,
+        options: Optional[dict] = None,
         initial_soc: float = 0,
         geometry: Optional[pybamm.Geometry] = None,
         parameter_values: Optional[pybamm.ParameterValues] = None,
@@ -253,9 +255,12 @@ class LiionBatteryPack(vs.Storage):
         var_pts: Optional[dict] = None,
         spatial_methods: Optional[dict] = None,
         output_variables: Optional[list] = None,
+        max_charge_rate: float = 0.7,
+        max_discharge_rate: float = 1.5,
+        min_charge_current: float = 0.05,
+        min_discharge_current: float = 0.05,
     ) -> None:
-        parameter_values = parameter_values if parameter_values else model.default_parameter_values
-        parameter_values.update({"Current function [A]": "[input]"}, check_already_exists=False)
+        parameter_values = parameter_values if parameter_values else model_type().default_parameter_values
         self.v_cut_lower = parameter_values["Lower voltage cut-off [V]"]
         self.v_cut_higher = parameter_values["Upper voltage cut-off [V]"]
 
@@ -296,10 +301,56 @@ class LiionBatteryPack(vs.Storage):
         self.last_power = 0.0
         self.V_terminal = np.float32(V_node[self.Terminal_Node][0])
 
-        self.inputs_dict = build_inputs_dict(self.shm_i_app)
-        sim, self._ocv_values, self._soc_values = setup_basic_simulation(
-            model, parameter_values, initial_soc=initial_soc, geometry=geometry, submesh_types=submesh_types, var_pts=var_pts, spatial_methods=spatial_methods, solver=pybamm.CasadiSolver(mode="safe")
+        experiment = pybamm.Experiment(
+            [
+                (
+                    f"Charge at {max_charge_rate}C until {self.v_cut_higher - 0.005}V",
+                    f"Hold at {self.v_cut_higher - 0.005}V until {min_charge_current}A"
+                )
+            ],
+            period = "1 second",
         )
+        charging_sim = pybamm.Simulation(
+            experiment=experiment,
+            model=model_type(),
+            geometry=geometry,
+            parameter_values=parameter_values.copy(),
+            submesh_types=submesh_types,
+            var_pts=var_pts,
+            spatial_methods=spatial_methods,
+        )
+        sol = charging_sim.solve(initial_soc=0)
+        self._ocv_charging = sol["Surface open-circuit voltage [V]"].data
+        self._max_power_charging = - sol["Power [W]"].data
+
+        experiment = pybamm.Experiment(
+            [
+                (
+                    f"Discharge at {max_discharge_rate}C until {self.v_cut_lower + 0.01}V",
+                    f"Hold at {self.v_cut_lower + 0.01}V until {min_discharge_current}A"
+                )
+            ],
+            period = "1 second",
+        )
+        discharging_sim = pybamm.Simulation(
+            experiment=experiment,
+            model=model_type(),
+            geometry=geometry,
+            parameter_values=parameter_values.copy(),
+            submesh_types=submesh_types,
+            var_pts=var_pts,
+            spatial_methods=spatial_methods,
+        )
+        sol = discharging_sim.solve(initial_soc=1)
+        self._ocv_discharging = sol["Surface open-circuit voltage [V]"].data[::-1]
+        self._max_power_discharging = sol["Power [W]"].data[::-1]
+
+        parameter_values.update({"Current function [A]": "[input]"}, check_already_exists=False)
+        sim, self._ocv_values, self._soc_values = setup_basic_simulation(
+            model_type(options), parameter_values, initial_soc=initial_soc, geometry=geometry, submesh_types=submesh_types, var_pts=var_pts, spatial_methods=spatial_methods, solver=pybamm.CasadiSolver(mode="safe")
+        )
+
+        self.inputs_dict = build_inputs_dict(self.shm_i_app)
         self.actor = Actor()
         self.actor.setup(
             dt=self.step_size,
@@ -338,16 +389,24 @@ class LiionBatteryPack(vs.Storage):
         return state
     
     def update(self, power, duration):
-        # Get the ocv and internal resistance
+        # Get the ocv and terminal voltage
         temp_v = self.output[0,:]
         temp_ocv = self.output[1,:]
-        # Check if voltage limits are reached
-        if np.any(temp_v < self.v_cut_lower) and power <= 0:
-            # Can not discharge further
-            power = 0.0
-        if np.any(temp_v > self.v_cut_higher) and power >= 0:
-            # Can not charge further
-            power = 0.0
+        # Compute power limits 
+        if power > 0.0:
+            max_voltage_idx = np.argmax(temp_v)
+            idx = np.searchsorted(self._ocv_charging, temp_ocv[max_voltage_idx], side="right")
+            if idx == len(self._ocv_charging):
+                power = 0.0
+            elif power > self._max_power_charging[idx] * self.Nspm:
+                power = self._max_power_charging[idx] * self.Nspm
+        elif power < 0.0:
+            min_voltage_idx = np.argmin(temp_v)
+            idx = np.searchsorted(self._ocv_discharging, temp_ocv[min_voltage_idx], side="left")
+            if idx == 0:
+                power = 0.0
+            elif power < - self._max_power_discharging[idx] * self.Nspm:
+                power = - self._max_power_discharging[idx] * self.Nspm
         # Calculate whether resting or restarting
         self.resting = power == 0.0 and self.last_power == 0.0
         self.restarting = power != 0.0 and self.last_power == 0.0
