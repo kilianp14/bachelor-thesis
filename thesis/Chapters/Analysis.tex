@@ -2,12 +2,25 @@ In this chapter, the implementation of four models for lithium-ion batteries is 
 
 \section{Battery Models for Co-Simulation}
 \label{battery_models_for_co_simulation}
+The explained battery models are parameterized to represent a battery pack of rechargeable Lithium-Ion INR21700 M50 cells \footnote{The product specification can be found under this link: \url{https://www.dnkpower.com/wp-content/uploads/2019/02/LG-INR21700-M50-Datasheet.pdf}}. For experimentation, a pack of 16 cells is used, whereas four series groups are connected in parallel (4S4P) as depicted in Figure \ref{fig:pack_circuit}.
 
+There are four different mathematical models described in total that increase in complexity. Section \ref{simple_battery} discusses the simplest lossless model, Section \ref{clc_battery} adds power constraints and inefficiencies to the model, in Section \ref{pybamm_battery} electrochemistry of individual cells are considered, and Section \ref{liion_battery_pack} extends this to include losses due to the battery pack's circuit on top. 
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{thesis/Images/pack_circuit.pdf}
+    \caption{Visualization of the battery pack used for experimentation. It was obtained utilizing functions from the Liionpack \cite{tranter2022liionpack} and Lcapy libraries \cite{lcapy} early during a discharging experiment.\\ The individual battery cells are represented by voltage sources and a resistor to their left, indicating the cell's internal resistance.}
+    \label{fig:pack_circuit}
+\end{figure}
 
 \subsection{SimpleBattery}
+\label{simple_battery}
 \subsection{CLCBattery}
+\label{clc_battery}
 \subsection{PybammBattery}
+\label{pybamm_battery}
 \subsection{LiionBatteryPack}
+\label{liion_battery_pack}
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/charging_efficiency.pdf}
