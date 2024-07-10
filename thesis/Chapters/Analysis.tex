@@ -5,7 +5,6 @@ In this chapter, the implementation of four models for lithium-ion batteries is 
 The explained battery models are parameterized to represent a battery pack of rechargeable Lithium-Ion INR21700 M50 cells \footnote{The product specification can be found under this link: \url{https://www.dnkpower.com/wp-content/uploads/2019/02/LG-INR21700-M50-Datasheet.pdf}}. For experimentation, a pack of 16 cells is used, whereas four series groups are connected in parallel (4S4P) as depicted in Figure \ref{fig:pack_circuit}.
 
 There are four different mathematical models described in total that increase in complexity. Section \ref{simple_battery} discusses the simplest lossless model, Section \ref{clc_battery} adds power constraints and inefficiencies to the model, in Section \ref{pybamm_battery} electrochemistry of individual cells are considered, and Section \ref{liion_battery_pack} extends this to include losses due to the battery pack's circuit on top. 
-
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/pack_circuit.pdf}
@@ -15,24 +14,66 @@ There are four different mathematical models described in total that increase in
 
 \subsection{SimpleBattery}
 \label{simple_battery}
+The \textbf{SimpleBattery} only receives two parameters upon initialization, the battery's energy capacity $C$ in $Wh$ and the initial SoC, which is used for determining the battery's initial energy $b(0)$. When updated, given the power $p_s(t)$ and the duration $d_s(t)$ of that time-step $t$, the battery's new energy is then computed using this formula:
+\begin{equation}
+b(t) = \begin{dcases}
+    \min(C,\: b(t-1) + p_s(t) \cdot d_s(t)) & \vert\: p_s(t) \ge 0\\
+    \max(0,\: b(t-1) + p_s(t) \cdot d_s(t)) & \vert\: p_s(t) < 0\\
+\end{dcases}
+\end{equation}
+
+The (dis-)charged energy that is to be returned when implementing the proposed storage interface, is $p_s(t) \cdot d_s(t)$ in the default case, $-b(t-1)$ if the battery is fully discharged, or $C - b(t-1)$ if the battery is fully charged during the time-step. The battery's state of charge can be simply determined as $\text{SoC}(t) = \frac{b(t)}{C}$.
+
+The parameterization of this model to reflect the mentioned battery pack only requires a value for the battery capacity $C$. To ensure comparability between the different models, it was determined using a PyBaMM simulation of a lithium-ion cell with the SPMe model and the parameterization of the used cell by Chen et al. \cite{chen2020development}. A complete discharge at $0.2C$ of a single cell returned an energy of $C = 18.87Wh$ compared to the $18.20Wh$ that is listed in the product specification. This value is just multiplied by the number of cells to get the total energy capacity of a battery pack.
+
 \subsection{CLCBattery}
 \label{clc_battery}
-\subsection{PybammBattery}
-\label{pybamm_battery}
-\subsection{LiionBatteryPack}
-\label{liion_battery_pack}
+The \textbf{CLCBattery} implements the C-L-C model by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, which has been presented in detail in Section \ref{c_l_c_model}. When updated, the model behaves similar to the \textbf{SimpleBattery}, but includes constant inefficiency factors, so that the updated energy level can be computed based on the Equations \ref{eq:2.1} and \ref{eq:2.2}:
+\begin{equation}
+    b(t) = \begin{dcases}
+    b(t-1) + \eta_c \cdot p_s(t) \cdot d_s(t) & \vert\: p_s(t) \ge 0\\
+    b(t-1) + \eta_d \cdot p_s(t) \cdot d_s(t) & \vert\: p_s(t) < 0\\
+\end{dcases}
+\end{equation}
+
+The \textbf{CLCBattery} adds a lot of complexity regarding battery limitations, though. With a constant voltage $V$, as assumed in the model, and linear energy limits $a_1(I(t)) = u_1 \cdot I(t) + v_1$ and $a_2(I(t)) = u_2 \cdot I(t) + v_2$, the Equations \ref{eq:2.3}, \ref{eq:2.4} and \ref{eq:2.5} result in the following power limitations when charging or discharging at each time-step $t$:
+\begin{align}
+    \alpha_d \cdot V &\le p_s(t) \le \alpha_c \cdot V \\
+    \frac{b(t-1) - v_1}{\frac{u_1}{V} - d_s(t) \cdot \eta_d} &\le p_s(t) \le \frac{b(t-1) - v_2}{\frac{u_2}{V} - d_s(t) \cdot \eta_c}
+\end{align}
+Whenever the input power $p_s(t)$ would these (dis-)charging limits the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textbf{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
+
+In the C-L-C model, the voltage $V(t)$ is assumed to be constant, and for the experiments set to the nominal voltage of the modeled lithium-ion cell, which is $3.63V$ according to the product specification. The (dis-)charging current limits are defined to be $\alpha_d = -1.5C$ and $\alpha_c = 0.7C$ at $25^{\circ}C$ in the same way.
+
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/charging_efficiency.pdf}
-    \caption{Average charging efficiency}
+    \caption{(Dis-)charging efficiencies based on battery voltage and (dis-)charging currents, as determined using PyBaMM.}
     \label{fig:charging_efficiency}
 \end{figure}
+
+The constant inefficiency factors $\eta_c$ and $\eta_d$ were determined again using PyBaMM simulations as shown in Figure \ref{fig:charging_efficiency}. The charging efficiency is thereby shown based on the voltage $V$ and the charging rate, whereas the simulation computed the internal battery resistance $R_i$ used to evaluate the formula described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}:
+\begin{equation}
+    \eta_c(I, V) = 1 - \frac{I \cdot R_i}{V}
+\end{equation}
+The approximations for the inefficiencies are the values of these functions at the standard discharge rate of $0.2C$, and the standard charge rate of $0.3C$ at the nominal voltage of $3.63V$. The resulting inefficiencies for the cell described by the \textbf{CLCBattery} are therefore fixed at $\eta_d = 1.014$, and $\eta_c = 0.978$.
+
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/energy_limits.pdf}
     \caption{Energy limits}
     \label{fig:energy_limits}
 \end{figure}
+
+Finally, the upper and lower energy limits are parameterized to be linearly approximated as determined by PyBaMM simulations, which is also shown in Figure \ref{fig:energy_limits}:
+$$a_1(I) = -0.03828 \cdot I \text{,}\:\:\:\: a_2(I) = -0.68904 \cdot I + 19.14$$
+
+\subsection{PybammBattery}
+\label{pybamm_battery}
+\subsection{LiionBatteryPack}
+\label{liion_battery_pack}
+
+
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/soc_estimation.pdf}

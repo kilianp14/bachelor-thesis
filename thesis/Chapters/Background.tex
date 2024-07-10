@@ -101,7 +101,7 @@ In every time-step $t$, the PI model gets the applied power $p(t)$, the energy c
 The mentioned energy delta of a step $t$ is computed by multiplying the applied power $p(t)$\footnote{$p(t) > 0$ indicates charging and $p(t) < 0$ indicates discharging.} times the duration $d$ and a (dis-)charging penalty, marking the power loss due to inefficiencies (see equation \ref{eq:2.2}). Thereby, $\eta_c(I, V)$ (charging inefficiency) describes a function representing the fraction of power stored in the battery while it is charged with a certain power $p$, while $\eta_d(I, V)$ (discharging inefficiency) stands for the function representing the fraction of power that has to be discharged from the battery to obtain the power $p$. Subsequently, $0 \le \eta_c(I, V) \le 1$ and $\eta_c(I, V) \ge 1$ hold true. Note that the charging and discharging inefficiencies are dependent on the battery's current $I(t)$, and the battery's voltage $V(t)$.
 
 \begin{equation}\label{eq:2.2}
-    \Delta_E(k) = \begin{dcases} \eta_c(I(t),V(t))\cdot p(t)\cdot d & \vert\: p(t) \ge 0\\ \eta_d(I(t),V(t))\cdot p(t)\cdot d & \vert\: p(t) < 0
+    \Delta_E(t) = \begin{dcases} \eta_c(I(t),V(t))\cdot p(t)\cdot d & \vert\: p(t) \ge 0\\ \eta_d(I(t),V(t))\cdot p(t)\cdot d & \vert\: p(t) < 0
     \end{dcases}
 \end{equation}
 
