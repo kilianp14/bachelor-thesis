@@ -36,21 +36,23 @@ The \textbf{CLCBattery} implements the C-L-C model by Kazhamiaka et al. \cite{ka
 \end{dcases}
 \end{equation}
 
-The \textbf{CLCBattery} adds a lot of complexity regarding battery limitations, though. With a constant voltage $V$, as assumed in the model, and linear energy limits $a_1(I(t)) = u_1 \cdot I(t) + v_1$ and $a_2(I(t)) = u_2 \cdot I(t) + v_2$, the Equations \ref{eq:2.3}, \ref{eq:2.4} and \ref{eq:2.5} result in the following power limitations when charging or discharging at each time-step $t$:
-\begin{align}
-    \alpha_d \cdot V &\le p_s(t) \le \alpha_c \cdot V \\
-    \frac{b(t-1) - v_1}{\frac{u_1}{V} - d_s(t) \cdot \eta_d} &\le p_s(t) \le \frac{b(t-1) - v_2}{\frac{u_2}{V} - d_s(t) \cdot \eta_c}
-\end{align}
-Whenever the input power $p_s(t)$ would these (dis-)charging limits the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textbf{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
-
-In the C-L-C model, the voltage $V(t)$ is assumed to be constant, and for the experiments set to the nominal voltage of the modeled lithium-ion cell, which is $3.63V$ according to the product specification. The (dis-)charging current limits are defined to be $\alpha_d = -1.5C$ and $\alpha_c = 0.7C$ at $25^{\circ}C$ in the same way.
-
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/charging_efficiency.pdf}
     \caption{(Dis-)charging efficiencies based on battery voltage and (dis-)charging currents, as determined using PyBaMM.}
     \label{fig:charging_efficiency}
 \end{figure}
+
+The \textbf{CLCBattery} adds a lot of complexity regarding battery limitations, though. With a constant voltage $V$, as assumed in the model, and linear energy limits $a_1(I(t)) = u_1 \cdot I(t) + v_1$ and $a_2(I(t)) = u_2 \cdot I(t) + v_2$, the Equations \ref{eq:2.3}, \ref{eq:2.4} and \ref{eq:2.5} result in the following power limitations when charging or discharging at each time-step $t$:
+\begin{align}
+    \alpha_d \cdot V &\le p_s(t) \le \alpha_c \cdot V \\
+    \frac{b(t-1) - v_1}{\frac{u_1}{V} - d_s(t) \cdot \eta_d} &\le p_s(t) \le \frac{b(t-1) - v_2}{\frac{u_2}{V} - d_s(t) \cdot \eta_c}
+\end{align}
+These limitations can also just be scaled linearly by the number of lithium-ion cells when considering battery packs.
+
+Whenever the input power $p_s(t)$ would these (dis-)charging limits, the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textbf{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
+
+In the C-L-C model, the voltage $V(t)$ is assumed to be constant, and for the experiments set to the nominal voltage of the modeled lithium-ion cell, which is $3.63V$ according to the product specification. The (dis-)charging current limits are defined to be $\alpha_d = -1.5C$ and $\alpha_c = 0.7C$ at $25^{\circ}C$ in the same way.
 
 The constant inefficiency factors $\eta_c$ and $\eta_d$ were determined again using PyBaMM simulations as shown in Figure \ref{fig:charging_efficiency}. The charging efficiency is thereby shown based on the voltage $V$ and the charging rate, whereas the simulation computed the internal battery resistance $R_i$ used to evaluate the formula described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}:
 \begin{equation}
