@@ -63,12 +63,13 @@ The approximations for the inefficiencies are the values of these functions at t
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/energy_limits.pdf}
-    \caption{Energy limits dependent on the (dis-)charging current }
+    \caption{Energy limits of a single battery cell based on the (dis-)charging current.}
     \label{fig:energy_limits}
 \end{figure}
 
-Finally, the upper and lower energy limits are parameterized to be linearly approximated as determined by PyBaMM simulations, which is also shown in Figure \ref{fig:energy_limits}:
+Finally, the linear approximations of the upper and lower energy limits, as shown in Figure \ref{fig:energy_limits}, were again determined by PyBaMM simulations:
 $$a_1(I) = -0.087 \cdot I \text{,}\:\:\:\: a_2(I) = -1.326 \cdot I + 19.14$$
+For battery packs, these energy limits can be scaled linearly by the number of individual cells as well.
 
 \subsection{PybammBattery}
 \label{pybamm_battery}
