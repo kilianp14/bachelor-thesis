@@ -9,6 +9,52 @@ import vessim as vs
 from solver_utils import create_casadi_objects, serial_step, serial_eval, setup_basic_simulation, build_inputs_dict
 from netlist_utils import solve_circuit_vectorized, power_loss
 
+class SimpleBattery(vs.Storage):
+    """(Way too) simple battery.
+
+    Args:
+        capacity: Battery's energy capacity. (Wh).
+        initial_soc: Initial battery state-of-charge. Has to be between 0 and 1. Defaults to 0.
+    """
+
+    def __init__(self, capacity: float, initial_soc: float = 0):
+        self.capacity = capacity
+        assert 0 <= initial_soc <= 1
+        self.charge_level = capacity * initial_soc
+        self._soc = initial_soc
+
+    def update(self, power: float, duration: int) -> float:
+        if duration <= 0.0:
+            raise ValueError("Duration needs to be a positive value")
+
+        charged_energy = power * duration / 3600  # Total energy to be (dis)charged in Wh
+        new_charge_level = self.charge_level + charged_energy
+
+        if new_charge_level < 0:
+            # Battery can not be discharged further than the minimum state-of-charge
+            charged_energy = -self.charge_level
+            self.charge_level = 0.0
+            self._soc = 0.0
+        elif new_charge_level > self.capacity:
+            # Battery can not be charged past its capacity
+            charged_energy = self.capacity - self.charge_level
+            self.charge_level = self.capacity
+            self._soc = 1.0
+        else:
+            self.charge_level = new_charge_level
+            self._soc = self.charge_level / self.capacity
+
+        return charged_energy * 3600  # Wh to Ws
+
+    def soc(self) -> float:
+        return self._soc
+
+    def state(self) -> dict:
+        return {
+            "soc": self._soc,
+            "charge_level": self.charge_level,
+            "capacity": self.capacity,
+        }
 
 class CLCBattery(vs.Storage):
     """CLC Battery model for lithium-ion batteries. Default is the LGM50 21700 parameterization.
@@ -17,82 +63,68 @@ class CLCBattery(vs.Storage):
         cell_capacity: Single cell battery capacity in Wh. Default is 19.065Wh.
         initial_soc: Initial battery state-of-charge. Has to be between 0 and 1. Defaults to 0.
         nom_voltage: Single cell nominal voltage in V. Defaults to 3.63V.
-        alpha_d: Maximum discharging C-rate. Defaults to 1.5C.
+        alpha_d: Maximum discharging C-rate. Defaults to -1.5C.
         alpha_c: Maximum charging C-rate. Defaults to 0.7C.
         eta_d: Average fraction of power that has to be discharged from battery to obtain said
             power. Is equivalent to the discharging inefficiency. Defaults to 1.014.
         eta_c: Average fraction of power that is stored in battery when charged at said power.
             Is equivalent to the charging inefficiency. Defualts to 0.978.
         u_1: Linear factor for the lower state-of-charge limit depending on the applied discharge
-            current. Defaults to 0.002.
+            current. Defaults to -0.087.
         v_1: Offset for the lower state-of-charge limit depending on the applied discharge current.
             Defaults to 0.0.
         u_2: Linear factor for the upper state-of-charge limit depending on the applied charge
-            current. Defaults to -0.036.
+            current. Defaults to -1.326.
         v_2: Offset for the upper state-of-charge limit depending on the applied charge current.
-            Defaults to 1.
+            Defaults to 19.14.
         lowest_charging_current: Current at which charging is stopped. Defaults to 0.05A.
         lowest_discharging_current: Current at which discharging is stopped. Defaults to 0.05A.
     """
     def __init__(
         self,
         number_of_cells: int = 1,
-        cell_capacity: float = 19.065,
         initial_soc: float = 0,
         nom_voltage: float = 3.63,
-        alpha_d: float = 1.5,
+        alpha_d: float = -1.5,
         alpha_c: float = 0.7,
         eta_d: float = 1.014,
         eta_c: float = 0.978,
-        u_1: float = 0.002,
+        u_1: float = -0.087,
         v_1: float = 0.0,
-        u_2: float = -0.036,
-        v_2: float = 1.0,
+        u_2: float = -1.326,
+        v_2: float = 19.14,
         lowest_charging_current: float = 0.05,
-        lowest_discharging_current: float = 0.05,
+        lowest_discharging_current: float = -0.05,
     ) -> None:
         assert number_of_cells > 0, "There has to be a positive number of cells."
         self.number_of_cells = number_of_cells
-        self.cell_capacity = cell_capacity # Wh
         assert 0 <= initial_soc <= 1, "Invalid initial state-of-charge. Has to be between 0 and 1."
-        self.charge_level = cell_capacity * initial_soc # Wh
+        self.u_1 = u_1
+        self.v_1 = v_1
+        self.u_2 = u_2
+        self.v_2 = v_2
+        self.charge_level = self.v_2 * initial_soc # Wh
         self.nom_voltage = nom_voltage # V
-        capacity = self.cell_capacity / self.nom_voltage # A
-        self.alpha_d = - alpha_d * capacity # C-Rate to A
-        self.alpha_c = alpha_c * capacity # C-Rate to A
+        self.alpha_d = alpha_d * self.v_2
+        self.alpha_c = alpha_c * self.v_2
         self.eta_d = eta_d
         self.eta_c = eta_c
-        self.u_1 = u_1 * self.cell_capacity # A at SoC -> A at Wh
-        self.v_1 = v_1 * self.cell_capacity # A at SoC -> A at Wh
-        self.u_2 = u_2 * self.cell_capacity # A at SoC -> A at Wh
-        self.v_2 = v_2 * self.cell_capacity # A at SoC -> A at Wh
         self.lowest_charging_power = lowest_charging_current * self.nom_voltage
-        self.lowest_discharging_power = - lowest_discharging_current * self.nom_voltage
+        self.lowest_discharging_power = lowest_discharging_current * self.nom_voltage
 
     def soc(self) -> float:
-        return self.charge_level / self.cell_capacity
+        return self.charge_level / self.v_2
 
     def update(self, power: float, duration: int) -> float:
-        applied_power = power
-        current = applied_power/ self.nom_voltage
-        if current < self.alpha_d * self.number_of_cells:
-            print("Discharging current exceeds maximum discharge rate.")
-            current = self.alpha_d * self.number_of_cells
-            applied_power = current * self.nom_voltage
-        elif current > self.alpha_c * self.number_of_cells:
-            print("Charging current exceeds maximum charging rate.")
-            current = self.alpha_c * self.number_of_cells
-            applied_power = current * self.nom_voltage
-
-        if applied_power > 0:
-            return self.charge(applied_power, duration)
-        elif applied_power < 0:
-            return self.discharge(applied_power, duration)
+        if power > 0:
+            return self.charge(power, duration)
+        elif power < 0:
+            return self.discharge(power, duration)
         else:
             return 0
 
     def charge(self, power: float, duration: int) -> float:
-        max_power = (self.charge_level - self.v_2) / (self.u_2  / self.nom_voltage - duration * self.eta_c / 3600) * self.number_of_cells
+        max_power = np.minimum((self.charge_level - self.v_2) / (self.u_2  / self.nom_voltage - duration * self.eta_c / 3600), self.alpha_c) * self.number_of_cells
         if power > max_power:
             power = max_power
         if power < self.lowest_charging_power:
@@ -101,7 +133,7 @@ class CLCBattery(vs.Storage):
         return power * duration
 
     def discharge(self, power: float, duration: int) -> float:
-        min_power = -(self.charge_level - self.v_1) / (self.u_1  / self.nom_voltage - duration * self.eta_d / 3600) * self.number_of_cells
+        min_power = np.maximum((self.charge_level - self.v_1) / (self.u_1  / self.nom_voltage - duration * self.eta_d / 3600), self.alpha_d) * self.number_of_cells
         if power < min_power:
             power = min_power
         if power > self.lowest_discharging_power:
@@ -113,7 +145,7 @@ class CLCBattery(vs.Storage):
         return {
             "soc": self.soc(),
             "charge_level": self.charge_level * self.number_of_cells,
-            "capacity": self.cell_capacity * self.number_of_cells,
+            "capacity": self.v_2 * self.number_of_cells,
         }
 
 
@@ -421,7 +453,7 @@ class LiionBatteryPack(vs.Storage):
         self.netlist.loc[self.V_map, ("value")] = temp_ocv
         self.netlist.loc[self.Ri_map, ("value")] = self.temp_Ri
         # Solve the circuit
-        power_loss(self.netlist, include_Ri=True)
+        power_loss(self.netlist)
         V_node, I_batt = solve_circuit_vectorized(self.netlist, -power)
         self.V_terminal = np.float32(V_node[self.Terminal_Node][0])
         I_app = I_batt[:] * -1
