@@ -63,18 +63,22 @@ The approximations for the inefficiencies are the values of these functions at t
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/energy_limits.pdf}
-    \caption{Energy limits}
+    \caption{Energy limits dependent on the (dis-)charging current }
     \label{fig:energy_limits}
 \end{figure}
 
 Finally, the upper and lower energy limits are parameterized to be linearly approximated as determined by PyBaMM simulations, which is also shown in Figure \ref{fig:energy_limits}:
-$$a_1(I) = -0.03828 \cdot I \text{,}\:\:\:\: a_2(I) = -0.68904 \cdot I + 19.14$$
+$$a_1(I) = -0.087 \cdot I \text{,}\:\:\:\: a_2(I) = -1.326 \cdot I + 19.14$$
 
 \subsection{PybammBattery}
 \label{pybamm_battery}
-\subsection{LiionBatteryPack}
-\label{liion_battery_pack}
 
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{thesis/Images/power_limits.pdf}
+    \caption{Power limits}
+    \label{fig:power_limits}
+\end{figure}
 
 \begin{figure}[t]
     \centering
@@ -82,6 +86,10 @@ $$a_1(I) = -0.03828 \cdot I \text{,}\:\:\:\: a_2(I) = -0.68904 \cdot I + 19.14$$
     \caption{State-of-Charge estimation}
     \label{fig:soc_estimation}
 \end{figure}
+\subsection{LiionBatteryPack}
+\label{liion_battery_pack}
+
+
 \section{Experimental Results and Discussion}
 \label{experimental_results_and_discussion}
 \begin{figure}[t]
