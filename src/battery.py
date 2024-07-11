@@ -200,7 +200,7 @@ class PybammBattery(vs.Storage):
             solver=solver,
         )
         sol = charging_sim.solve(initial_soc=0)
-        self._ocv_charging = sol["Surface open-circuit voltage [V]"].data
+        self._ocv_charging = sol["Battery open-circuit voltage [V]"].data
         self._max_power_charging = - sol["Power [W]"].data
 
         experiment = pybamm.Experiment(
@@ -223,7 +223,7 @@ class PybammBattery(vs.Storage):
             solver=solver,
         )
         sol = discharging_sim.solve(initial_soc=1)
-        self._ocv_discharging = sol["Surface open-circuit voltage [V]"].data[::-1]
+        self._ocv_discharging = sol["Battery open-circuit voltage [V]"].data[::-1]
         self._max_power_discharging = sol["Power [W]"].data[::-1]
 
         parameter_values.update({"Power function [W]": "[input]"}, check_already_exists=False)
@@ -238,7 +238,7 @@ class PybammBattery(vs.Storage):
         self.cell_solution = self.sim.step(dt=1e-6, inputs={"Power function [W]": 0.0}).last_state
 
     def soc(self) -> float:
-        value = self.cell_solution['Surface open-circuit voltage [V]'].data[0]
+        value = self.cell_solution['Battery open-circuit voltage [V]'].data[0]
         idx = np.searchsorted(self._ocv_values, value, side='right')
         if idx == 0:
             return 0.0
@@ -250,16 +250,16 @@ class PybammBattery(vs.Storage):
             return y1 + (value - x1) * (y2 - y1) / (x2 - x1)
 
     def update(self, power: float, duration: int) -> float:
-        value = self.cell_solution['Surface open-circuit voltage [V]'].data[0]
+        value = self.cell_solution['Battery open-circuit voltage [V]'].data[0]
         if power > 0.0:
-            idx = np.searchsorted(self._ocv_charging, value, side="right")
-            if idx == len(self._ocv_charging):
+            idx = np.searchsorted(self._ocv_charging, value, side="right") + duration
+            if idx >= len(self._ocv_charging):
                 power = 0.0
             elif power > self._max_power_charging[idx] * self.number_of_cells:
                 power = self._max_power_charging[idx] * self.number_of_cells
         elif power < 0.0:
-            idx = np.searchsorted(self._ocv_discharging, value, side="left")
-            if idx == 0:
+            idx = np.searchsorted(self._ocv_discharging, value, side="left") - duration
+            if idx <= 0:
                 power = 0.0
             elif power < - self._max_power_discharging[idx] * self.number_of_cells:
                 power = - self._max_power_discharging[idx] * self.number_of_cells
@@ -318,7 +318,7 @@ class LiionBatteryPack(vs.Storage):
         # 1D model
         self.variable_names = [
             "Terminal voltage [V]",
-            "Surface open-circuit voltage [V]",
+            "Battery open-circuit voltage [V]",
         ]
         if output_variables is not None:
             for out in output_variables:
@@ -352,7 +352,7 @@ class LiionBatteryPack(vs.Storage):
             spatial_methods=spatial_methods,
         )
         sol = charging_sim.solve(initial_soc=0)
-        self._ocv_charging = sol["Surface open-circuit voltage [V]"].data
+        self._ocv_charging = sol["Battery open-circuit voltage [V]"].data
         self._max_power_charging = - sol["Power [W]"].data
 
         experiment = pybamm.Experiment(
@@ -374,7 +374,7 @@ class LiionBatteryPack(vs.Storage):
             spatial_methods=spatial_methods,
         )
         sol = discharging_sim.solve(initial_soc=1)
-        self._ocv_discharging = sol["Surface open-circuit voltage [V]"].data[::-1]
+        self._ocv_discharging = sol["Battery open-circuit voltage [V]"].data[::-1]
         self._max_power_discharging = sol["Power [W]"].data[::-1]
 
         parameter_values.update({"Current function [A]": "[input]"}, check_already_exists=False)
@@ -421,21 +421,23 @@ class LiionBatteryPack(vs.Storage):
         return state
     
     def update(self, power, duration):
+        if duration != self.step_size:
+            raise RuntimeError("Duration has to be equal to step-size due to bad implementation.")
         # Get the ocv and terminal voltage
         temp_v = self.output[0,:]
         temp_ocv = self.output[1,:]
         # Compute power limits 
         if power > 0.0:
             max_voltage_idx = np.argmax(temp_v)
-            idx = np.searchsorted(self._ocv_charging, temp_ocv[max_voltage_idx], side="right")
-            if idx == len(self._ocv_charging):
+            idx = np.searchsorted(self._ocv_charging, temp_ocv[max_voltage_idx], side="right") + duration
+            if idx >= len(self._ocv_charging):
                 power = 0.0
             elif power > self._max_power_charging[idx] * self.Nspm:
                 power = self._max_power_charging[idx] * self.Nspm
         elif power < 0.0:
             min_voltage_idx = np.argmin(temp_v)
-            idx = np.searchsorted(self._ocv_discharging, temp_ocv[min_voltage_idx], side="left")
-            if idx == 0:
+            idx = np.searchsorted(self._ocv_discharging, temp_ocv[min_voltage_idx], side="left") - duration
+            if idx <= 0:
                 power = 0.0
             elif power < - self._max_power_discharging[idx] * self.Nspm:
                 power = - self._max_power_discharging[idx] * self.Nspm

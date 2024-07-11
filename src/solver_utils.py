@@ -1,6 +1,7 @@
 import casadi
 import pybamm
 import numpy as np
+import pandas as pd
 import pybamm
 from typing import Optional
 
@@ -256,49 +257,32 @@ def setup_basic_simulation(
     solver: Optional[pybamm.BaseSolver] = None,
 ):
     # Get data for state-of-charge estimation
-    ocv_values = [parameter_values["Lower voltage cut-off [V]"]]
-    soc_values = [0.0]
-    for i in np.arange(0.01, 1, 0.01):
-        soc_sim = pybamm.Simulation(
-            model=model,
-            geometry=geometry,
-            parameter_values=parameter_values,
-            submesh_types=submesh_types,
-            var_pts=var_pts,
-            spatial_methods=spatial_methods,
-            solver=solver,
-        )
-        soc_sim.build(initial_soc=i)
-        if parameter_values["Current function [A]"].__class__ is pybamm.InputParameter:
-            sol = soc_sim.step(dt=1e-6, inputs={"Current function [A]": 0.0}).last_state
-        else:
-            sol = soc_sim.step(dt=1e-6, inputs={"Power function [W]": 0.0}).last_state
-        soc_values.append(i)
-        ocv_values.append(sol["Surface open-circuit voltage [V]"].data[-1])
-    ocv_values.append(parameter_values["Upper voltage cut-off [V]"])
-    soc_values.append(1.0)
-
-    #experiment = pybamm.Experiment(
-        #[
-            #(
-                #f"Charge at 1W until {parameter_values['Upper voltage cut-off [V]']}V",
-            #)
-        #],
-        #period="1 second"
-    #)
-    #soc_sim = pybamm.Simulation(
-        #model=model,
-        #experiment=experiment,
-        #geometry=geometry,
-        #parameter_values=parameter_values,
-        #submesh_types=submesh_types,
-        #var_pts=var_pts,
-        #spatial_methods=spatial_methods,
-        #solver=solver,
-    #)
-    #sol = soc_sim.solve(initial_soc=0)
-    #ocv_values = sol['Surface open-circuit voltage [V]'].data
-    #soc_values = np.linspace(0.0, 1.0, ocv_values.size)
+    df = pd.read_csv("data/SoC_Values.csv", index_col=0)
+    ocv_values = df["ocv_values"].to_numpy()
+    soc_values = df["soc_values"].to_numpy()
+    #ocv_values = [parameter_values["Lower voltage cut-off [V]"]]
+    #soc_values = [0.0]
+    #for i in np.arange(0.01, 1, 0.001):
+        #soc_sim = pybamm.Simulation(
+            #model=model,
+            #geometry=geometry,
+            #parameter_values=parameter_values,
+            #submesh_types=submesh_types,
+            #var_pts=var_pts,
+            #spatial_methods=spatial_methods,
+            #solver=solver,
+        #)
+        #soc_sim.build(initial_soc=i)
+        #if parameter_values["Current function [A]"].__class__ is pybamm.InputParameter:
+            #sol = soc_sim.step(dt=1e-6, inputs={"Current function [A]": 0.0}).last_state
+        #else:
+            #sol = soc_sim.step(dt=1e-6, inputs={"Power function [W]": 0.0}).last_state
+        #soc_values.append(i)
+        #ocv_values.append(sol["Battery open-circuit voltage [V]"].data[-1])
+    #ocv_values.append(parameter_values["Upper voltage cut-off [V]"])
+    #soc_values.append(1.0)
+    #df = pd.DataFrame({'ocv_values': ocv_values, 'soc_values': soc_values})
+    #df.to_csv('data/SoC_Values.csv', index=1)
 
     sim = pybamm.Simulation(
         model=model,

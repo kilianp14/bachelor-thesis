@@ -425,8 +425,8 @@ def make_lcapy_circuit(netlist):
     net2 = netlist.copy()
     net2.loc[I_map, ("node1")] = netlist["node2"][I_map]
     net2.loc[I_map, ("node2")] = netlist["node1"][I_map]
-    d1 = "down"
-    d2 = "up"
+    d1 = "right"
+    d2 = "left"
     I_xs = [net2[I_map]["node1_x"].values[0], net2[I_map]["node2_x"].values[0]]
     I_left = np.any(np.array(I_xs) == -1)
     all_desc = netlist["desc"].values
@@ -439,7 +439,7 @@ def make_lcapy_circuit(netlist):
             direction = d2
         elif desc[0] == "R":
             if desc[1] == "b":
-                direction = "right"
+                direction = "down"
             elif desc[1] == "t":
                 # These are the terminal nodes and require special attention
                 if desc[2] == "p":
@@ -468,20 +468,20 @@ def make_lcapy_circuit(netlist):
                     # and right-vertical-left if we're on the right side
                     if desc[2] == "p":
                         if I_left:
-                            direction = "left"
+                            direction = "up"
                             # if the terminal connection is not at the end then
                             # extend the element connections
                             if n1x > 0:
                                 direction += "=" + str(1 + n1x)
                         else:
-                            direction = "right"
+                            direction = "down"
                             if n1x < I_xs[0] - 1:
                                 direction += "=" + str(1 + I_xs[0] - n1x)
                     else:
                         if I_left:
-                            direction = "right"
+                            direction = "down"
                         else:
-                            direction = "left"
+                            direction = "up"
             else:
                 direction = d1
         if desc == "W":
@@ -492,7 +492,8 @@ def make_lcapy_circuit(netlist):
         string = string + ", color=" + color
         cct.add(string)
     # Add ground node
-    cct.add("W 0 00; down, sground")
+    cct.add("W 0 00; right, sground")
+    cct.add("; draw_nodes=connections, label_ids=none, label_nodes=none")
     return cct
 
 
