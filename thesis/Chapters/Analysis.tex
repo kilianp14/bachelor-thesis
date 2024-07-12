@@ -73,23 +73,36 @@ For battery packs, these energy limits can be scaled linearly by the number of i
 
 \subsection{PybammBattery}
 \label{pybamm_battery}
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\linewidth]{thesis/Images/power_limits.pdf}
-    \caption{Power limits}
-    \label{fig:power_limits}
-\end{figure}
+The \textbf{PybammBattery} uses the PyBaMM framework \cite{pybammbatteries} directly to simulate an individual lithium-ion cell. For the experiments, the Single Particle Model with electrolyte, which was described in Section \ref{single_particle_models}, is used together with an external circuit submodel to enable power-based inputs instead of current-based inputs. The single cell model is used with the parameterization for the Lithium-Ion INR21700 M50 cell as experimentally obtained by Chen et al. \cite{chen2020development}. To simulate battery packs, the input power $p_s(t)$ of time-step $t$ is divided by the number of cells before the PyBaMM simulation is stepped. 
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/soc_estimation.pdf}
-    \caption{State-of-Charge estimation}
+    \caption{Relation between the battery cell's State-of-Charge and Open-Circuit Voltage as obtained using PyBaMM.}
     \label{fig:soc_estimation}
 \end{figure}
+
+To ensure that limits of the battery cells are not exceeded, and visibility into the state is provided, the model is wrapped with BMS functionality. Firstly, the SoC is determined using the battery's Open-Circuit Voltage (OCV), which is the battery's difference in potential when resting, together with an OCV–SoC lookup table, as visualized in Figure \ref{fig:soc_estimation}. This only provides a fairly accurate estimation of the SoC because the exact OCV is known in the model. In a real scenario, the method could not be used, as the OCV cannot be measured accurately. Additionally, the relationship between the OCV and the SoC changes with temperature and battery age \cite{meng2017overview}.
+
+Secondly, also based on the OCV, power limits were determined to ensure that the battery does not exceed allowed currents and voltages when being (dis-)charged with a certain power. In particular, the charging rates cannot exceed $1.5C$, equivalent to $7.5A$, for discharging, and $0.7C$, equivalent to $3.5A$, for charging, whereas the battery cell's voltage is supposed to stay between $2.5V$ and $4.2V$. The power limits depending on the OCV were determined using two PyBaMM simulations and are shown in Figure \ref{fig:power_limits}. When the input power $p_s(t)$ would exceed the power limits based on the state, the maximum applicable power is used for (dis-)charging and computation of the stored or discharged energy, which has to be returned.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{thesis/Images/power_limits.pdf}
+    \caption{Power limits for charging and discharging based on the cell's OCV. In the more linear parts, the limits are the result of current boundaries, whereas voltage boundaries cause power limitations at a low SoC when discharging and at high SoC when charging.}
+    \label{fig:power_limits}
+\end{figure}
+
 \subsection{LiionBatteryPack}
 \label{liion_battery_pack}
+The \textbf{LiionBatteryPack} utilizes PyBaMM \cite{pybammbatteries} for simulation of battery cells, as well as methods for computing power-losses and solving power networks by Liionpack \cite{tranter2022liionpack} to model an entire lithium-ion battery pack, such as the one visualized in Figure \ref{fig:pack_circuit}.Thereby, a series of steps are performed to determine the new battery state at every time-step $t$:
+\begin{enumerate}
+    \item The internal resistances and voltages are computed for every individual cell and included in the network representation.
+    \item The network is solved based on the input power $p_s(t)$, which determines the applied currents for the cells.
+    \item The electrochemical system of each cell is stepped with their respective current input using PyBaMM.
+\end{enumerate}
 
+Again, this model is wrapped with a BMS. The SoC is computed for all the cells in the same way as for the \textbf{PybammBattery}, and then averaged in the end. The power limits are also determined similar to the PyBaMM model described in Section \ref{pybamm_battery}, as the power limit is computed for the cell with the highest voltage when charging or the cell with the lowest voltage when discharging, and then scaled by the number of batteries in the battery pack. The determined applied power is once again used to compute the returned (dis-)charged energy by multiplication with the duration $d_s(t)$.
 
 \section{Experimental Results and Discussion}
 \label{experimental_results_and_discussion}
