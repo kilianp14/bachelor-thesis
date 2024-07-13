@@ -13,12 +13,17 @@ This is achieved by extending the already existing co-simulation infrastructure 
 
 This work then describes the implementation of four different mathematical models of lithium-ion battery packs with battery management systems, using the proposed interface for energy storage units:
 \begin{enumerate}
-    \item The simplest model (\textit{SimpleBattery}) simulates a basic, lossless battery that has a fixed capacity, and does not consider any inefficiencies or physical properties of a battery pack.
-    \item The \textit{CLCBattery} implements the C-L-C model as described by Kazhamiaka et al. \cite{kazhamiaka2019tractable} that is still a simple linear mathematical model for single lithium-ion battery cells, but considers properties such as charging and discharging inefficiencies and power limits.
-    \item The \textit{PybammBattery} uses the PyBaMM framework \cite{pybammbatteries} to simulate individual lithium-ion cells that behave according to the Single Particle Model, which takes the electrochemical processes inside a battery into account.
-    \item Finally, the \textit{LiionBatteryPack} models the behavior of a full lithium-ion battery pack, where the cells are modeled using PyBaMM's Single Particle Model, and the battery pack's circuit is solved using methods of the Liionpack framework \cite{tranter2022liionpack}.
+    \item The simplest model (\textbf{SimpleBattery}) simulates a basic, lossless battery that has a fixed capacity, and does not consider any inefficiencies or physical properties of a battery pack.
+    \item The \textbf{CLCBattery} implements the C-L-C model as described by Kazhamiaka et al. \cite{kazhamiaka2019tractable} that is still a simple linear mathematical model for single lithium-ion battery cells, but considers properties such as charging and discharging inefficiencies and power limits.
+    \item The \textbf{PybammBattery} uses the PyBaMM framework \cite{pybammbatteries} to simulate individual lithium-ion cells that behave according to the Single Particle Model, which takes the electrochemical processes inside a battery into account.
+    \item Finally, the \textbf{LiionBatteryPack} models the behavior of a full lithium-ion battery pack, where the cells are modeled using PyBaMM's Single Particle Model, and the battery pack's circuit is solved using methods of the Liionpack framework \cite{tranter2022liionpack}.
 \end{enumerate}
 
 In the end, the enhanced co-simulation design of Vessim \cite{vessim} is used to analyze, how these different models behave in different scenarios within a simulated microgrid, which can represent a data center's energy system.
 
 \section{Overview}
+Following this introductory chapter, Chapter \ref{background} provides relevant background information on the topics of this work such as Microgrids, Co-Simulation, and Battery Modeling as well as used frameworks like Vessim \cite{vessim} and Mosaik \cite{mosaik}. Afterward, Chapter \ref{related_work} presents an overview of related research in these areas.
+
+Chapter \ref{integration} then describes the extended co-simulation infrastructure that can be used to integrate energy storage models into a testbed for data centers, and explains, how they interact with the other co-simulation components.
+
+In Chapter \ref{analysis}, the implementation of the mentioned battery models is discussed before their behavior in various energy system simulation scenarios is analyzed and discussed. Finally, Chapter \ref{conclusion} concludes this thesis by summarizing the key findings of this work.
