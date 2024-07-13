@@ -27,24 +27,24 @@ class SimpleBattery(vs.Storage):
         if duration <= 0.0:
             raise ValueError("Duration needs to be a positive value")
 
-        charged_energy = power * duration / 3600  # Total energy to be (dis)charged in Wh
-        new_charge_level = self.charge_level + charged_energy
+        charged_energy = power * duration  # Total energy to be (dis)charged in Ws
+        new_charge_level = self.charge_level + charged_energy / 3600
 
         if new_charge_level < 0:
             # Battery can not be discharged further than the minimum state-of-charge
-            charged_energy = -self.charge_level
+            charged_energy = -self.charge_level * 3600
             self.charge_level = 0.0
             self._soc = 0.0
         elif new_charge_level > self.capacity:
             # Battery can not be charged past its capacity
-            charged_energy = self.capacity - self.charge_level
+            charged_energy = (self.capacity - self.charge_level) * 3600
             self.charge_level = self.capacity
             self._soc = 1.0
         else:
             self.charge_level = new_charge_level
             self._soc = self.charge_level / self.capacity
 
-        return charged_energy * 3600  # Wh to Ws
+        return charged_energy
 
     def soc(self) -> float:
         return self._soc
@@ -318,6 +318,7 @@ class LiionBatteryPack(vs.Storage):
         # 1D model
         self.variable_names = [
             "Terminal voltage [V]",
+            "Surface open-circuit voltage [V]",
             "Battery open-circuit voltage [V]",
         ]
         if output_variables is not None:
@@ -398,7 +399,7 @@ class LiionBatteryPack(vs.Storage):
     def soc(self):
         soc = 0
         for i in range(self.Nspm):
-            value = self.output[1,i]
+            value = self.output[2,i]
             idx = np.searchsorted(self._ocv_values, value, side='right')
             if idx == 0:
                 soc += 0.0
@@ -425,7 +426,7 @@ class LiionBatteryPack(vs.Storage):
             raise RuntimeError("Duration has to be equal to step-size due to bad implementation.")
         # Get the ocv and terminal voltage
         temp_v = self.output[0,:]
-        temp_ocv = self.output[1,:]
+        temp_ocv = self.output[2,:]
         # Compute power limits 
         if power > 0.0:
             max_voltage_idx = np.argmax(temp_v)
@@ -452,7 +453,7 @@ class LiionBatteryPack(vs.Storage):
             self.temp_Ri = self.calculate_internal_resistance()
         self.shm_Ri[:] = self.temp_Ri
         # Update netlist
-        self.netlist.loc[self.V_map, ("value")] = temp_ocv
+        self.netlist.loc[self.V_map, ("value")] = self.output[1,:]
         self.netlist.loc[self.Ri_map, ("value")] = self.temp_Ri
         # Solve the circuit
         power_loss(self.netlist)
