@@ -108,28 +108,33 @@ Again, this model is wrapped with a BMS. The SoC is computed for all the cells i
 \label{experimental_results}
 At first, it is shown, how the models behave when discharged at a constant power from a full to an empty state, whereas the results of this experiment are visualized in Figure \ref{fig:discharging_experiment}. 
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\linewidth]{thesis/Images/discharging_experiment.pdf}
-    \caption{Behavior of the models when discharged at constant power at different rates.}
-    \label{fig:discharging_experiment}
-\end{figure}
-
 When comparing the \textit{SimpleBattery} to the \textit{CLCBattery}, it is noticeable that they produce almost the same traces, as both of their capacities were obtained using the drawn energy received by PyBaMM discharging experiments. Because the lower energy limits of the \textit{CLCBattery} are fairly small, a real difference at low SoC values can only be seen at high discharge rates. As soon as the discharging rates exceed the value of $1.5C$, the \textit{CLCBattery} limits the output power, resulting in the much faster discharging of the \textit{SimpleBattery}.
 
 The \textit{CLCBattery} achieves fairly accurate results compared to the \textit{PybammBattery} and the \textit{LiionBatteryPack} over all charging rates. It is, however, visible that it discharges slightly faster at low rates because the constant $\eta_d$ factor overestimates the actual inefficiencies in these cases. The higher the discharging rate, the more the inefficiency is underestimated, which results in the slower discharges here, when no current limitations are applicable. This starts at rates around $1.5C$, from where once again the \textit{CLCBattery} empties faster than the \textit{PybammBattery} and the \textit{LiionBatteryPack} due to the voltage of the electrochemical cells in the complex models being lower than the nominal voltage the \textit{CLCBattery} uses, which results in lower power limits. 
 
 The \textit{PybammBattery} reflects the \textit{LiionBatteryPack} almost perfectly, as only at higher discharging rates the power losses of the circuit, which are determined in the later model, have a high enough impact to be visible in the overall trend. Through this experiment, it can also be observed that in both of the models, the SoC is overestimated ever so slightly around half-full state.
 
-A similar experiment is now conducted for charging from empty to full state, pictured in Figure \ref{fig:charging_experiment}. Hereby, the differences between the \textit{SimpleBattery} and the \textit{CLCBattery} become more obvious.
+A similar experiment is now conducted for charging from empty to full state, pictured in Figure \ref{fig:charging_experiment}. Hereby, the differences between the \textit{SimpleBattery} and the \textit{CLCBattery} become more obvious. Even though they initially charge at the same speed at low to medium charging rates, due to the quickly falling upper energy limits of the \textit{CLCBattery}, the \textit{SimpleBattery} reaches its full state much sooner, as no power limitations are considered here. At charging rates exceeding the set $0.7C$, the BMS of the \textit{CLCBattery} limits the current as well, resulting in an even slower discharge compared to the \textit{SimpleBattery}.
 
-\begin{figure}[t]
+The \textit{CLCBattery}, however, seems to reflect the charging process of the \textit{PybammBattery} and the \textit{LiionBatteryPack} quite well over all charging rates again. Similar to the discharging experiment, the \textit{CLCBattery} again overestimates the inefficiency at low charging rates, and slightly underestimates the inefficiency at higher charging rates as is expected. The underestimation is not really visible in the figure because of the mentioned inaccuracy of the SoC computation for the complex models.
+
+Because the current limits, and the resulting power limits, are even lower for charging than for discharging, the differences between the \textit{PybammBattery} and the \textit{Liionpack} is even smaller in this experiment, as the power losses induces by the pack's circuit are almost negligible.
+
+\begin{figure}[htbt]
+    \centering
+    \includegraphics[width=\linewidth]{thesis/Images/discharging_experiment.pdf}
+    \caption{Behavior of the models when discharged at constant power at different rates.}
+    \label{fig:discharging_experiment}
+\end{figure}
+
+\newpage
+
+\begin{figure}[h]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/charging_experiment.pdf}
     \caption{Behavior of the models when charged at constant power at different rates.}
     \label{fig:charging_experiment}
 \end{figure}
-
 
 \section{Discussion}
 \label{discussion}
