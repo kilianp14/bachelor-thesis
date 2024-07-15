@@ -14,7 +14,7 @@ There are four different mathematical models described in total that increase in
 
 \subsection{SimpleBattery}
 \label{simple_battery}
-The \textbf{SimpleBattery} only receives two parameters upon initialization, the battery's energy capacity $C$ in $Wh$ and the initial SoC, which is used for determining the battery's initial energy $b(0)$. When updated, given the power $p_s(t)$ and the duration $d_s(t)$ of that time-step $t$, the battery's new energy is then computed using this formula:
+The \textit{SimpleBattery} only receives two parameters upon initialization, the battery's energy capacity $C$ in $Wh$ and the initial SoC, which is used for determining the battery's initial energy $b(0)$. When updated, given the power $p_s(t)$ and the duration $d_s(t)$ of that time-step $t$, the battery's new energy is then computed using this formula:
 \begin{equation}
 b(t) = \begin{dcases}
     \min(C,\: b(t-1) + p_s(t) \cdot d_s(t)) & \vert\: p_s(t) \ge 0\\
@@ -28,7 +28,7 @@ The parameterization of this model to reflect the mentioned battery pack only re
 
 \subsection{CLCBattery}
 \label{clc_battery}
-The \textbf{CLCBattery} implements the C-L-C model by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, which has been presented in detail in Section \ref{c_l_c_model}. When updated, the model behaves similar to the \textbf{SimpleBattery}, but includes constant inefficiency factors, so that the updated energy level can be computed based on the Equations \ref{eq:2.1} and \ref{eq:2.2}:
+The \textit{CLCBattery} implements the C-L-C model by Kazhamiaka et al. \cite{kazhamiaka2019tractable}, which has been presented in detail in Section \ref{c_l_c_model}. When updated, the model behaves similar to the \textit{SimpleBattery}, but includes constant inefficiency factors, so that the updated energy level can be computed based on the Equations \ref{eq:2.1} and \ref{eq:2.2}:
 \begin{equation}
     b(t) = \begin{dcases}
     b(t-1) + \eta_c \cdot p_s(t) \cdot d_s(t) & \vert\: p_s(t) \ge 0\\
@@ -43,14 +43,14 @@ The \textbf{CLCBattery} implements the C-L-C model by Kazhamiaka et al. \cite{ka
     \label{fig:charging_efficiency}
 \end{figure}
 
-The \textbf{CLCBattery} adds a lot of complexity regarding battery limitations, though. With a constant voltage $V$, as assumed in the model, and linear energy limits $a_1(I(t)) = u_1 \cdot I(t) + v_1$ and $a_2(I(t)) = u_2 \cdot I(t) + v_2$, the Equations \ref{eq:2.3}, \ref{eq:2.4} and \ref{eq:2.5} result in the following power limitations when charging or discharging at each time-step $t$:
+The \textit{CLCBattery} adds a lot of complexity regarding battery limitations, though. With a constant voltage $V$, as assumed in the model, and linear energy limits $a_1(I(t)) = u_1 \cdot I(t) + v_1$ and $a_2(I(t)) = u_2 \cdot I(t) + v_2$, the Equations \ref{eq:2.3}, \ref{eq:2.4} and \ref{eq:2.5} result in the following power limitations when charging or discharging at each time-step $t$:
 \begin{align}
     \alpha_d \cdot V &\le p_s(t) \le \alpha_c \cdot V \\
     \frac{b(t-1) - v_1}{\frac{u_1}{V} - d_s(t) \cdot \eta_d} &\le p_s(t) \le \frac{b(t-1) - v_2}{\frac{u_2}{V} - d_s(t) \cdot \eta_c}
 \end{align}
 These limitations can also just be scaled linearly by the number of lithium-ion cells when considering battery packs.
 
-Whenever the input power $p_s(t)$ would these (dis-)charging limits, the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textbf{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
+Whenever the input power $p_s(t)$ would these (dis-)charging limits, the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textit{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
 
 In the C-L-C model, the voltage $V(t)$ is assumed to be constant, and for the experiments set to the nominal voltage of the modeled lithium-ion cell, which is $3.63V$ according to the product specification. The (dis-)charging current limits are defined to be $\alpha_d = -1.5C$ and $\alpha_c = 0.7C$ at $25^{\circ}C$ in the same way.
 
@@ -58,7 +58,7 @@ The constant inefficiency factors $\eta_c$ and $\eta_d$ were determined again us
 \begin{equation}
     \eta_c(I, V) = 1 - \frac{I \cdot R_i}{V}
 \end{equation}
-The approximations for the inefficiencies are the values of these functions at the standard discharge rate of $0.2C$, and the standard charge rate of $0.3C$ at the nominal voltage of $3.63V$. The resulting inefficiencies for the cell described by the \textbf{CLCBattery} are therefore fixed at $\eta_d = 1.014$, and $\eta_c = 0.978$.
+The approximations for the inefficiencies are the values of these functions at the standard discharge rate of $0.2C$, and the standard charge rate of $0.3C$ at the nominal voltage of $3.63V$. The resulting inefficiencies for the cell described by the \textit{CLCBattery} are therefore fixed at $\eta_d = 1.014$, and $\eta_c = 0.978$.
 
 \begin{figure}[t]
     \centering
@@ -73,7 +73,7 @@ For battery packs, these energy limits can be scaled linearly by the number of i
 
 \subsection{PybammBattery}
 \label{pybamm_battery}
-The \textbf{PybammBattery} uses the PyBaMM framework \cite{pybammbatteries} directly to simulate an individual lithium-ion cell. For the experiments, the Single Particle Model with electrolyte, which was described in Section \ref{single_particle_models}, is used together with an external circuit submodel to enable power-based inputs instead of current-based inputs. The single cell model is used with the parameterization for the Lithium-Ion INR21700 M50 cell as experimentally obtained by Chen et al. \cite{chen2020development}. To simulate battery packs, the input power $p_s(t)$ of time-step $t$ is divided by the number of cells before the PyBaMM simulation is stepped. 
+The \textit{PybammBattery} uses the PyBaMM framework \cite{pybammbatteries} directly to simulate an individual lithium-ion cell. For the experiments, the Single Particle Model with electrolyte, which was described in Section \ref{single_particle_models}, is used together with an external circuit submodel to enable power-based inputs instead of current-based inputs. The single cell model is used with the parameterization for the Lithium-Ion INR21700 M50 cell as experimentally obtained by Chen et al. \cite{chen2020development}. To simulate battery packs, the input power $p_s(t)$ of time-step $t$ is divided by the number of cells before the PyBaMM simulation is stepped. 
 
 \begin{figure}[t]
     \centering
@@ -95,29 +95,41 @@ Secondly, also based on the OCV, power limits were determined to ensure that the
 
 \subsection{LiionBatteryPack}
 \label{liion_battery_pack}
-The \textbf{LiionBatteryPack} utilizes PyBaMM \cite{pybammbatteries} for simulation of battery cells, as well as methods for computing power-losses and solving power networks by Liionpack \cite{tranter2022liionpack} to model an entire lithium-ion battery pack, such as the one visualized in Figure \ref{fig:pack_circuit}.Thereby, a series of steps are performed to determine the new battery state at every time-step $t$:
+The \textit{LiionBatteryPack} utilizes PyBaMM \cite{pybammbatteries} for simulation of battery cells, as well as methods for computing power-losses and solving power networks by Liionpack \cite{tranter2022liionpack} to model an entire lithium-ion battery pack, such as the one visualized in Figure \ref{fig:pack_circuit}.Thereby, a series of steps are performed to determine the new battery state at every time-step $t$:
 \begin{enumerate}
     \item The internal resistances and voltages are computed for every individual cell and included in the network representation.
     \item The network is solved based on the input power $p_s(t)$, which determines the applied currents for the cells.
     \item The electrochemical system of each cell is stepped with their respective current input using PyBaMM.
 \end{enumerate}
 
-Again, this model is wrapped with a BMS. The SoC is computed for all the cells in the same way as for the \textbf{PybammBattery}, and then averaged in the end to obtain the SoC of the battery pack. The power limits are also determined similar to the PyBaMM model described in Section \ref{pybamm_battery}, as the power limit is computed for the cell with the highest voltage when charging and for the cell with the lowest voltage when discharging, and then scaled by the number of batteries in the battery pack. The determined applied power is once again used to compute the returned (dis-)charged energy $e(t)$ by multiplication with the duration $d_s(t)$.
+Again, this model is wrapped with a BMS. The SoC is computed for all the cells in the same way as for the \textit{PybammBattery}, and then averaged in the end to obtain the SoC of the battery pack. The power limits are also determined similar to the PyBaMM model described in Section \ref{pybamm_battery}, as the power limit is computed for the cell with the highest voltage when charging and for the cell with the lowest voltage when discharging, and then scaled by the number of batteries in the battery pack. The determined applied power is once again used to compute the returned (dis-)charged energy $e(t)$ by multiplication with the duration $d_s(t)$.
 
 \section{Experimental Results}
 \label{experimental_results}
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\linewidth]{thesis/Images/charging_experiment.pdf}
-    \caption{Charging Experiment}
-    \label{fig:charging_experiment}
-\end{figure}
+At first, it is shown, how the models behave when discharged at a constant power from a full to an empty state, whereas the results of this experiment are visualized in Figure \ref{fig:discharging_experiment}. 
+
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/discharging_experiment.pdf}
-    \caption{Discharging Experiment}
+    \caption{Behavior of the models when discharged at constant power at different rates.}
     \label{fig:discharging_experiment}
 \end{figure}
+
+When comparing the \textit{SimpleBattery} to the \textit{CLCBattery}, it is noticeable that they produce almost the same traces, as both of their capacities were obtained using the drawn energy received by PyBaMM discharging experiments. Because the lower energy limits of the \textit{CLCBattery} are fairly small, a real difference at low SoC values can only be seen at high discharge rates. As soon as the discharging rates exceed the value of $1.5C$, the \textit{CLCBattery} limits the output power, resulting in the much faster discharging of the \textit{SimpleBattery}.
+
+The \textit{CLCBattery} achieves fairly accurate results compared to the \textit{PybammBattery} and the \textit{LiionBatteryPack} over all charging rates. It is, however, visible that it discharges slightly faster at low rates because the constant $\eta_d$ factor overestimates the actual inefficiencies in these cases. The higher the discharging rate, the more the inefficiency is underestimated, which results in the slower discharges here, when no current limitations are applicable. This starts at rates around $1.5C$, from where once again the \textit{CLCBattery} empties faster than the \textit{PybammBattery} and the \textit{LiionBatteryPack} due to the voltage of the electrochemical cells in the complex models being lower than the nominal voltage the \textit{CLCBattery} uses, which results in lower power limits. 
+
+The \textit{PybammBattery} reflects the \textit{LiionBatteryPack} almost perfectly, as only at higher discharging rates the power losses of the circuit, which are determined in the later model, have a high enough impact to be visible in the overall trend. Through this experiment, it can also be observed that in both of the models, the SoC is overestimated ever so slightly around half-full state.
+
+A similar experiment is now conducted for charging from empty to full state, pictured in Figure \ref{fig:charging_experiment}. Hereby, the differences between the \textit{SimpleBattery} and the \textit{CLCBattery} become more obvious.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{thesis/Images/charging_experiment.pdf}
+    \caption{Behavior of the models when charged at constant power at different rates.}
+    \label{fig:charging_experiment}
+\end{figure}
+
 
 \section{Discussion}
 \label{discussion}
