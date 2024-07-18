@@ -173,14 +173,19 @@ When looking at the exchanged energy with the grid (depicted in Figure \ref{fig:
 
 \subsection{Runtime Analysis}
 \label{runtime_analysis}
-To determine the efficiency and therefore the usefulness of the described models, a runtime analysis is conducted
+To determine the efficiency and therefore the usefulness of the described models, a runtime analysis is conducted. To ensure comparability between the obtained data, the experiments were executed on a virtual node in the cloud \footnote{Machine type: Google Cloud Platform GCE C3}. The experimental results are presented in Figure \ref{fig:runtime_analysis}.
+
+As was to be expected, there is only little difference in performance between the \textit{SimpleBattery} and the \textit{CLCBattery} because both are linear models. The median execution time of a single simulation time-step for the \textit{SimpleBattery} was around $191\mu s$ compared to $196\mu s$ of the \textit{CLCBattery}. For both these models and the \textit{PybammBattery}, the execution time does not change with the size of the battery pack, as only a single cell modeling approach is used, where relevant parameters are scaled using the number of cells in the battery pack.
+
+The complexity of the optimization problem for the \textit{LiionBatteryPack} scales linearly with the number of cells, as can be seen in the figure. A $32S32P$ battery pack imitated using the \textit{LiionBatteryPack} model with a total of $1024$ cells can only step two to three times per second on the used node, whereas the model for the $16S16P$ pack has a median execution time of $0.095s$. That is nearly $500$ times higher than for the \textit{SimpleBattery} and the \textit{CLCBattery}, and more than $12$ times higher than for the \textit{PybammBattery} with $7.65ms$.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/runtime_analysis.pdf}
-    \caption{}
+    \caption{Runtime distributions when executing a single simulation time-step.}
     \label{fig:runtime_analysis}
 \end{figure}
 
+\newpage
 \section{Discussion}
 \label{discussion}
