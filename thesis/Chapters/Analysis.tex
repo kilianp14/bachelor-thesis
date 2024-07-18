@@ -162,8 +162,6 @@ The development of the SoC depending on the model used is captured in Figure \re
     \label{fig:scenario_soc}
 \end{figure}
 
-When looking at the exchanged energy with the grid (depicted in Figure \ref{fig:scenario_grid_energy}), it is obtained that over the course of the two days, the \textit{LiionBatteryPack} used a net $1103Wh$ of energy from the grid, with the battery having to charge a total amount of $3435Wh$, and having fed back only around $2332Wh$. This net grid charge is $1.9\%$ higher than for the \textit{PybammBattery} ($1081Wh$), $8.5\%$ higher than for the \textit{CLCBattery} ($1016Wh$), and a total of $41.5\%$ higher than for the \textit{SimpleBattery} ($779Wh$) for this particular scenario.
-
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/scenario_grid_energy.pdf}
@@ -171,8 +169,18 @@ When looking at the exchanged energy with the grid (depicted in Figure \ref{fig:
     \label{fig:scenario_grid_energy}
 \end{figure}
 
+When looking at the exchanged energy with the grid (depicted in Figure \ref{fig:scenario_grid_energy}), it is obtained that over the course of the two days, the \textit{LiionBatteryPack} used a net $1103Wh$ of energy from the grid, with the battery having to charge a total amount of $3435Wh$, and having fed back only around $2332Wh$. This net grid charge is $1.9\%$ higher than for the \textit{PybammBattery} ($1081Wh$), $8.5\%$ higher than for the \textit{CLCBattery} ($1016Wh$), and a total of $41.5\%$ higher than for the \textit{SimpleBattery} ($779Wh$) for this particular scenario.
+
 \subsection{Runtime Analysis}
 \label{runtime_analysis}
+To determine the efficiency and therefore the usefulness of the described models, a runtime analysis is conducted
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{thesis/Images/runtime_analysis.pdf}
+    \caption{}
+    \label{fig:runtime_analysis}
+\end{figure}
 
 \section{Discussion}
 \label{discussion}
