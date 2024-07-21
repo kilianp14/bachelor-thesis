@@ -104,6 +104,8 @@ The \textit{LiionBatteryPack} utilizes PyBaMM \cite{pybammbatteries} for simulat
 
 Again, this model is wrapped with a BMS. The SoC is computed for all the cells in the same way as for the \textit{PybammBattery}, and then averaged in the end to obtain the SoC of the battery pack. The power limits are also determined similar to the PyBaMM model described in Section \ref{pybamm_battery}, as the power limit is computed for the cell with the highest voltage when charging and for the cell with the lowest voltage when discharging, and then scaled by the number of batteries in the battery pack. The determined applied power is once again used to compute the returned (dis-)charged energy $e(t)$ by multiplication with the duration $d_s(t)$.
 
+\newpage
+
 \begin{figure}[h]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/discharging_experiment.pdf}
@@ -130,6 +132,8 @@ The differences between the \textit{SimpleBattery} and the \textit{CLCBattery} b
 The \textit{CLCBattery} seems to reflect the charging process of the \textit{PybammBattery} and the \textit{LiionBatteryPack} quite well again over all charging rates. Similar to the discharging experiment, the \textit{CLCBattery} overestimates the inefficiency at low charging rates, and underestimates the inefficiency at higher charging rates. The underestimation is not really visible in the figure because of the mentioned inaccuracy of the SoC computation for the complex models.
 
 Because the current limits, and the resulting power limits, are even lower for charging than for discharging, the differences between the \textit{PybammBattery} and the \textit{Liionpack} is even smaller in this experiment, as the power losses induces by the pack's circuit are almost negligible.
+
+\newpage
 
 \begin{figure}[h]
     \centering
@@ -192,4 +196,4 @@ Firstly, we can say that the extended Vessim co-simulation architecture with the
 
 When we compare the models, it becomes obvious that for the used cell, the \textit{SimpleBattery} fails to accurately represent the battery's SoC, especially for charging at an almost full state, while also providing inaccurate estimations of exchanged grid energy in a microgrid scenario. This makes it very unsuitable for experiments with the main focus on energy management. However, the \textit{SimpleBattery} still captures the overall trends, which makes it still useful for scenarios that only try to determine broad tendencies like, for instance, the effectiveness of load forecasting. The reason for that is the straightforward parameterization, the fast runtime, and the independence of the used energy storage, as not only batteries can be modeled this way.
 
-Compared to the \textit{SimpleBattery}, the \textit{CLCBattery} has only minimal performance overhead, while accurately computing the battery's state, and providing a solid estimation of used grid energy, and is therefore applicable for most use-cases where a microgrid is simulated. The difficulty of finding a representative parameterization for the utilized battery cells can be solved using its product specifications and perhaps tools like PyBaMM \cite{pybammbatteries}.
+Compared to the \textit{SimpleBattery}, the \textit{CLCBattery} has only minimal performance overhead, while accurately computing the battery's state, and providing a solid estimation of used grid energy. It is therefore applicable for most use-cases where a microgrid is simulated. Difficulties of finding a representative parameterization for the utilized battery cells can be solved using product specifications and perhaps tools like PyBaMM \cite{pybammbatteries}.
