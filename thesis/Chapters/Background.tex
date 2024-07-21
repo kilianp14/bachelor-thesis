@@ -30,7 +30,7 @@ Because the simulation units are treated as independent black-boxes, to run a co
 
 Within a co-simulation environment, each simulation unit is operated as an independent module using its individual simulation algorithm. By selecting and implementing appropriate models for each subsystem, this modularity ensures that the models are more specialized and tailored to the characteristics of its modeled subsystem. With the described black-box approach, co-simulation treats individual components as interchangeable, which means that as long as the inputs and outputs of a component adhere to a predefined interface, they can be swapped with alternative components without making extensive modifications to the general system architecture necessary. Therefore, co-simulation allows for more flexibility compared to a monolithic approach.
 
-Following this, the next sections will present relevant frameworks for this work using co-simulation, where Section \ref{mosaik_framework} explains the Mosaik framework \cite{mosaik}, and Section \ref{vessim_infrastructure} introduces Vessim \cite{vessim}, which is used for evaluating the approaches of this thesis and builds on top of Mosaik.
+Following this, the next sections will present relevant frameworks for this work using co-simulation, where Section \ref{mosaik_framework} explains the Mosaik framework \cite{mosaik}, and Section \ref{vessim_architecture} introduces Vessim \cite{vessim}, which is used for evaluating the approaches of this thesis and builds on top of Mosaik.
 
 \subsection{The Mosaik Framework}
 \label{mosaik_framework}
@@ -44,17 +44,17 @@ At its core, Mosaik is responsible for synchronizing processes that each run a s
     \item[] \textbf{Mosaik Scheduler:} The discrete-event orchestrator of the co-simulation. It is responsible for stepping the simulators through time while keeping them synchronized, and the data passing of inputs and outputs between the simulation units. Mosaik allows these simulation units to be continuous-time based or hybrid by wrapping them in discrete-event simulation units.
 \end{itemize}
 
-\subsection{Vessim Infrastructure}
-\label{vessim_infrastructure}
-With the goal of accelerating research in the area of sustainable computing, Wiesner et al. recently presented the Vessim Framework \cite{vessim}, which evolved in the last year to provide a co-simulation test environment for the development of carbon-aware applications and systems that interact with their power system. It allows users to define individual microgrids to represent these power systems of computing infrastructure like data centers, utilizing the described Mosaik framework under the hood. Thereby, each microgrid consists of multiple simulation units responsible for modeling generators, consumers, and energy storage as well as user-defined controllers, which can provide applications visibility and control over the power system.
+\subsection{Vessim Architecture}
+\label{vessim_architecture}
+With the goal of accelerating research in the area of sustainable computing, Wiesner et al. recently presented the Vessim Framework \cite{vessim}, which evolved in the last year to provide a co-simulation test environment for the development of carbon-aware applications and systems that interact with their power system. It allows users to define individual microgrids to represent the power systems of computing infrastructure like data centers, utilizing the described Mosaik framework under the hood. Thereby, each microgrid consists of multiple simulation units responsible for modeling generators, consumers, and energy storage as well as user-defined controllers, which can provide applications visibility and control over the power system.
 
 \begin{figure*}[t]
-    \includegraphics[width=\linewidth]{thesis/Images/Vessim_Infrastructure.pdf}
-    \caption{Microgrid co-simulation infrastructure as described by Wiesner et al. \cite{vessim}. Colored components mark Mosaik simulation units.}
-    \label{fig:vessim_infrastructure}
+    \includegraphics[width=\linewidth]{thesis/Images/Vessim_Architecture.pdf}
+    \caption{Microgrid co-simulation architecture as described by Wiesner et al. \cite{vessim}. Colored components mark Mosaik simulation units.}
+    \label{fig:vessim_architecture}
 \end{figure*}
 
-The co-simulation infrastructure of a single microgrid, which is depicted in Figure \ref{fig:vessim_infrastructure}, is defined using the Mosaik Scenario API, and the individual simulation units implement the high-level Python API of Mosaik. A Vessim microgrid consists of four distinct subsystems that are stepped in a specific order, whereas the Mosaik Scheduler handles data passing and synchronization.
+The co-simulation architecture of a single microgrid, which is depicted in Figure \ref{fig:vessim_architecture}, is defined using the Mosaik Scenario API, and the individual simulation units implement the high-level Python API of Mosaik. A Vessim microgrid consists of four distinct subsystems that are stepped in a specific order, whereas the Mosaik Scheduler handles data passing and synchronization.
 \begin{enumerate}
     \item \textbf{Actors:} The actors model the energy consumers and producers of the microgrid, and are characterized by their individual power trace $p^{<\text{actor}>}$. Every actor has its separate Mosaik simulation unit, which forwards the actor's power production ($p_t^{<\text{actor}>} > 0$) or power consumption ($p_t^{<\text{actor}>} < 0$) at every simulation step $t$. The actor models are highly variable as they can be everything from simulated nodes, which only read out historical traces of, for instance, solar irradiance or computation load, to nodes that monitor full on server farms, running hundreds of virtual machines where the power consumption is measured using power meters. Due to this high diversity, the actors also have the option to provide controllers with additional information to allow for better decision-making by transmitting their state ($\text{state}_t^{<\text{actor}>}$) to them.
     \item  \textbf{Grid:} The Grid simulator is responsible to model the power flow inside the microgrid's power network. At every simulation step $t$, it gets the power trace of the actors as input, and produces a power delta $\Delta p_t$ that can be stored to or has to be discharged from the energy storage. To accurately model this power flow, frameworks like PyPSA \cite{brown2017pypsa} can be used, but for many cases, a simple aggregation $\Delta p_t = \sum{p_t^{<\text{actor}>}}$ is enough.
