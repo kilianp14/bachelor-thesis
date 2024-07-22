@@ -1,14 +1,15 @@
-In this chapter, the implementation of four models for lithium-ion batteries is discussed, and their behavior in a co-simulation environment, depicting a data center's power system, is analyzed. Thereby, Section \ref{battery_models_for_co_simulation} introduces and parameterizes the used battery models, Section \ref{experimental_results} presents the experimental results of different scenarios, which are discussed in Section \ref{discussion}.
+In this chapter, the implementation of four models for lithium-ion batteries is discussed, and their behavior in a co-simulation environment, depicting a data center's power system, is analyzed. Section \ref{battery_models_for_co_simulation} introduces and parameterizes the used battery models, Section \ref{experimental_results} presents the experimental results of different scenarios, which are discussed in Section \ref{discussion}.
 
 \section{Battery Models for Co-Simulation}
 \label{battery_models_for_co_simulation}
-The explained battery models are parameterized to represent a battery pack of rechargeable Lithium-Ion INR21700 M50 cells \footnote{The product specification can be found under this link: \url{https://www.dnkpower.com/wp-content/uploads/2019/02/LG-INR21700-M50-Datasheet.pdf}}. An exemplary pack of 16 cells, where four series groups are connected in parallel (4S4P) is depicted in Figure \ref{fig:pack_circuit}.
+The explained battery models are parameterized to represent a battery pack of rechargeable Lithium-Ion INR21700 M50 cells \footnote{The product specification can be found under this link: \url{https://www.dnkpower.com/wp-content/uploads/2019/02/LG-INR21700-M50-Datasheet.pdf}}. Figure \ref{fig:pack_circuit} depicts an exemplary pack of 16 cells, where four series groups are connected in parallel (4S4P).
 
 There are four different mathematical models described in total that increase in complexity. Section \ref{simple_battery} discusses the simplest lossless model, Section \ref{clc_battery} adds power constraints and inefficiencies to the model, in Section \ref{pybamm_battery} electrochemistry of individual cells are considered, and Section \ref{liion_battery_pack} extends this to include losses due to the battery pack's circuit on top. 
+
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{thesis/Images/pack_circuit.pdf}
-    \caption{Visualization of a 4S4P battery pack. It was obtained utilizing functions from the Liionpack \cite{tranter2022liionpack} and Lcapy libraries \cite{lcapy} early during a discharging experiment. The individual battery cells are represented by voltage sources and a resistor to their left, indicating its internal resistance.}
+    \caption{Visualization of a 4S4P battery pack, as obtained utilizing functions from the Liionpack \cite{tranter2022liionpack} and Lcapy libraries \cite{lcapy} early during a discharging experiment. Voltage sources and a resistor to their left, indicating an internal resistance, represent the individual battery cells.}
     \label{fig:pack_circuit}
 \end{figure}
 
@@ -22,7 +23,7 @@ b(t) = \begin{dcases}
 \end{dcases}
 \end{equation}
 
-The (dis-)charged energy that is to be returned when implementing the proposed storage interface, is $p_s(t) \cdot d_s(t)$ in the default case, $-b(t-1)$ if the battery is fully discharged, or $C - b(t-1)$ if the battery is fully charged during the time-step. The battery's state of charge can be simply determined as $\text{SoC}(t) = \frac{b(t)}{C}$.
+The (dis-)charged energy that is to be returned when implementing the proposed storage interface, is $p_s(t) \cdot d_s(t)$ in the default case, $-b(t-1)$ if the battery is fully discharged, or $C - b(t-1)$ if the battery is fully charged during the time-step. The formula $\text{SoC}(t) = \frac{b(t)}{C}$ determines the battery's state of charge.
 
 The parameterization of this model to reflect the mentioned battery pack only requires a value for the battery capacity $C$. To ensure comparability between the different models, it was determined using a PyBaMM simulation of a lithium-ion cell with the SPMe model and the parameterization of the used cell by Chen et al. \cite{chen2020development}. A complete discharge at $0.2C$ of a single cell returned an energy of $C = 18.87Wh$ compared to the $18.20Wh$ that is listed in the product specification. This value is just multiplied by the number of cells to get the total energy capacity of a battery pack.
 
@@ -48,13 +49,13 @@ The \textit{CLCBattery} adds a lot of complexity regarding battery limitations, 
     \alpha_d \cdot V &\le p_s(t) \le \alpha_c \cdot V \\
     \frac{b(t-1) - v_1}{\frac{u_1}{V} - d_s(t) \cdot \eta_d} &\le p_s(t) \le \frac{b(t-1) - v_2}{\frac{u_2}{V} - d_s(t) \cdot \eta_c}
 \end{align}
-They can also be scaled linearly by the number of cells when considering battery packs.
+These constraints can also be scaled linearly by the number of cells when considering battery packs.
 
-Whenever the input power $p_s(t)$ would these (dis-)charging limits, the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textit{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
+Whenever the input power $p_s(t)$ would exceed these (dis-)charging limits, the BMS simply continues the (dis-)charge at the maximum allowed power. The total energy stored or discharged to be returned is therefore given by $e(t) = p_s(t) \cdot d_s(t)$. Similar to the \textit{SimpleBattery}, the SoC can be easily computed as $\text{SoC}(t) = \frac{b(t)}{v_2}$.
 
-In the C-L-C model, the voltage $V(t)$ is assumed to be constant, and for the experiments set to the nominal voltage of the modeled lithium-ion cell, which is $3.63V$ according to the product specification. The (dis-)charging current limits are defined to be $\alpha_d = -1.5C$ and $\alpha_c = 0.7C$ at $25^{\circ}C$ in the same way.
+The C-L-C model assumes constant Voltage $V(t)$, and, for the experiments, it is set to the nominal voltage of the modeled lithium-ion cell, which is $3.63V$ according to the product specification. The (dis-)charging current limits are defined to be $\alpha_d = -1.5C$ and $\alpha_c = 0.7C$ at $25^{\circ}C$ in the same way.
 
-The constant inefficiency factors $\eta_c$ and $\eta_d$ were determined again using PyBaMM simulations as shown in Figure \ref{fig:charging_efficiency}. The charging efficiency is thereby shown based on the voltage $V$ and the charging rate, whereas the simulation computed the internal battery resistance $R_i$ used to evaluate the formula described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}:
+PyBaMM simulations, as shown in Figure \ref{fig:charging_efficiency}, determined the constant inefficiency factors $\eta_c$ and $\eta_d$. The charging efficiency is shown based on the voltage $V$ and the charging rate, whereas the simulation computed the internal battery resistance $R_i$ used to evaluate the formula described by Kazhamiaka et al. \cite{kazhamiaka2019tractable}:
 \begin{equation}
     \eta_c(I, V) = 1 - \frac{I \cdot R_i}{V}
 \end{equation}
@@ -82,9 +83,9 @@ The \textit{PybammBattery} uses the PyBaMM framework \cite{pybammbatteries} dire
     \label{fig:soc_estimation}
 \end{figure}
 
-To ensure that limits of the battery cells are not exceeded, and visibility into the state is provided, the model is wrapped with BMS functionality. Firstly, the SoC is determined using the battery's Open-Circuit Voltage (OCV), which is the battery's difference in potential when resting, together with an OCV–SoC lookup table, as visualized in Figure \ref{fig:soc_estimation}. This only provides a fairly accurate estimation of the SoC because the exact OCV is known in the model. In a real scenario, the method could not be used, as the OCV cannot be measured accurately. Additionally, the relationship between the OCV and the SoC changes with temperature and battery age \cite{meng2017overview}.
+The model is wrapped with BMS functionality, ensuring that battery cells do not exceed their limits, and provide visibility into the battery's state. Firstly, the battery's Open-Circuit Voltage (OCV), which is the battery's difference in potential when resting, is used together with an OCV–SoC lookup table, as visualized in Figure \ref{fig:soc_estimation}, to determine the SoC. This only provides a fairly accurate estimation of the SoC because the exact OCV is known in the model. In a real scenario, the method is not applicable, as the OCV cannot be measured accurately. Additionally, the relationship between the OCV and the SoC changes with temperature and battery age \cite{meng2017overview}.
 
-Secondly, also based on the OCV, power limits were determined to ensure that the battery does not exceed allowed currents and voltages when being (dis-)charged with a certain power. In particular, the charging rates cannot exceed $1.5C$, equivalent to $7.5A$, for discharging, and $0.7C$, equivalent to $3.5A$, for charging, whereas the battery cell's voltage is supposed to stay between $2.5V$ and $4.2V$. The power limits depending on the OCV were determined using two PyBaMM simulations and are shown in Figure \ref{fig:power_limits}. When the input power $p_s(t)$ would exceed the power limits based on the state, the maximum applicable power is used for (dis-)charging and computation of the stored or discharged energy, which has to be returned.
+Secondly, also based on the OCV, power limits were determined to ensure that the battery does not exceed allowed currents and voltages when being (dis-)charged with a certain power. In particular, the charging rates cannot exceed $1.5C$, equivalent to $7.5A$, for discharging, and $0.7C$, equivalent to $3.5A$, for charging, whereas the battery cell's voltage remains between $2.5V$ and $4.2V$. Two PyBaMM simulations determine the power limits depending on the OCV, with Figure \ref{fig:power_limits} showing the results of the experiment. When the input power $p_s(t)$ would exceed the power limits based on the state, the maximum applicable power is used for (dis-)charging and the computation of the stored or discharged energy, which has to be returned.
 
 \begin{figure}[t]
     \centering
@@ -93,16 +94,18 @@ Secondly, also based on the OCV, power limits were determined to ensure that the
     \label{fig:power_limits}
 \end{figure}
 
+\newpage
+
 \subsection{LiionBatteryPack}
 \label{liion_battery_pack}
-The \textit{LiionBatteryPack} utilizes PyBaMM \cite{pybammbatteries} for simulation of battery cells, as well as methods for computing power-losses and solving power networks by Liionpack \cite{tranter2022liionpack} to model an entire lithium-ion battery pack, such as the one visualized in Figure \ref{fig:pack_circuit}. Thereby, a series of steps are performed to determine the new battery state at every time-step $t$:
+The \textit{LiionBatteryPack} utilizes PyBaMM \cite{pybammbatteries} for simulation of battery cells, as well as methods for computing power-losses and solving power networks by Liionpack \cite{tranter2022liionpack} to model an entire lithium-ion battery pack, such as the one visualized in Figure \ref{fig:pack_circuit}. It performs a series of steps to determine the new battery state at every time-step $t$:
 \begin{enumerate}
     \item The internal resistances and voltages are computed for every individual cell and included in the network representation.
     \item The network is solved based on the input power $p_s(t)$, which determines the applied currents for the cells.
-    \item The electrochemical system of each cell is stepped with their respective current input using PyBaMM.
+    \item The simulation steps the electrochemical system of each cell with their respective current input using PyBaMM.
 \end{enumerate}
 
-Again, this model is wrapped with a BMS. The SoC is computed for all the cells in the same way as for the \textit{PybammBattery}, and then averaged in the end to obtain the SoC of the battery pack. The power limits are also determined similar to the PyBaMM model described in Section \ref{pybamm_battery}, as the power limit is computed for the cell with the highest voltage when charging and for the cell with the lowest voltage when discharging, and then scaled by the number of batteries in the battery pack. The determined applied power is once again used to compute the returned (dis-)charged energy $e(t)$ by multiplication with the duration $d_s(t)$.
+Again, a BMS wraps the model. It computes the SoC for all the cells in the same way as for the \textit{PybammBattery}, and then averages them in the end to obtain the SoC of the battery pack. The power limits are also determined similar to the PyBaMM model described in Section \ref{pybamm_battery}, as the model's power limits are computed for the cell with the highest voltage when charging and for the cell with the lowest voltage when discharging, before being scaled by the number of batteries in the battery pack. The determined applied power is once again used to compute the returned (dis-)charged energy $e(t)$ by multiplication with the duration $d_s(t)$.
 
 \newpage
 
@@ -119,11 +122,11 @@ The described models are now used to represent a 16S16P battery pack of the INR2
 
 \subsection{Constant Power (Dis-)Charging}
 \label{constant_power_(dis-)charging}
-At first, it is shown, how the models behave when discharged at a constant power from a full to an empty state, and vice versa, whereas the results of the experiments are visualized in Figure \ref{fig:discharging_experiment} and Figure \ref{fig:charging_experiment}. 
+At first, it is shown, how the models behave when discharged at a constant power from a full to an empty state, and vice versa, whereas Figure \ref{fig:discharging_experiment} and Figure \ref{fig:charging_experiment} visualize the results of the experiments. 
 
 When comparing the \textit{SimpleBattery} to the \textit{CLCBattery} in the discharging scenarios, it is noticeable that they produce almost the same traces, as both of their capacities were obtained using the drawn energy received by PyBaMM discharging experiments. Because the lower energy limits of the \textit{CLCBattery} are fairly small, a real difference at low SoC values can only be seen at high discharge rates. As soon as the discharging rates exceed the value of $1.5C$, the \textit{CLCBattery} limits the output power, resulting in the much faster discharging of the \textit{SimpleBattery}.
 
-The \textit{CLCBattery} achieves fairly accurate results compared to the \textit{PybammBattery} and the \textit{LiionBatteryPack} over all discharging rates. It is, however, visible that it discharges slightly faster at low rates because the constant $\eta_d$ factor overestimates the actual inefficiencies in these cases. The higher the discharging rate, the more the inefficiency is underestimated, which results in the slower discharges here, when no current limitations are applicable. This starts at rates around $1.5C$, from where once again the \textit{CLCBattery} empties faster than the complex models due to the voltage of their cells being lower than the nominal voltage the \textit{CLCBattery} uses, resulting in lower power limits. 
+The \textit{CLCBattery} achieves fairly accurate results relative to the \textit{PybammBattery} and the \textit{LiionBatteryPack} over all discharging rates. It is, however, visible that it discharges slightly faster at low rates because the constant $\eta_d$ factor overestimates the actual inefficiencies in these cases. The higher the discharging rate, the more the inefficiency is underestimated, which results in the slower discharges here, when no current limitations are applicable. This starts at $1.5C$, where once again the \textit{CLCBattery} empties faster than the complex models due to the voltage of their cells being lower when discharging next to the nominal voltage the \textit{CLCBattery} uses, resulting in lower power limits. 
 
 The \textit{PybammBattery} reflects the \textit{LiionBatteryPack} almost perfectly, as only at higher discharging rates the power losses of the circuit, which are determined in the later model, have a high enough impact to be visible in the overall trend. Through this experiment, it can also be observed that in both of the models, the SoC is overestimated ever so slightly around half-full state.
 
@@ -131,7 +134,7 @@ The differences between the \textit{SimpleBattery} and the \textit{CLCBattery} b
 
 The \textit{CLCBattery} seems to reflect the charging process of the \textit{PybammBattery} and the \textit{LiionBatteryPack} quite well again over all charging rates. Similar to the discharging experiment, the \textit{CLCBattery} overestimates the inefficiency at low charging rates, and underestimates the inefficiency at higher charging rates. The underestimation is not really visible in the figure because of the mentioned inaccuracy of the SoC computation for the complex models.
 
-Because the current limits, and the resulting power limits, are even lower for charging than for discharging, the differences between the \textit{PybammBattery} and the \textit{Liionpack} is even smaller in this experiment, as the power losses induces by the pack's circuit are almost negligible.
+Because the current limits, and the resulting power limits, are even lower for charging than for discharging, the differences between the \textit{PybammBattery} and the \textit{Liionpack} are even smaller in this experiment, as the power losses induced by the pack's circuit are almost negligible.
 
 \newpage
 
@@ -144,7 +147,7 @@ Because the current limits, and the resulting power limits, are even lower for c
 
 \subsection{Data Center Scenario}
 \label{data_center_scenario}
-Now, a 48h-experiment is conducted based on a more realistic system configuration that is supposed to represent the power system of a simplified data center to test the models in a more variable environment, while utilizing the enhanced co-simulation capabilities of Vessim \cite{vessim}. In this scenario, there are two nodes, which represent servers in the data center that have a constant power consumption of $200W$ and $50W$ that are aggregated and multiplied by a power usage effectiveness (PUE) of $1.3$ to obtain the total power consumption of the mocked data center. Additionally, the power production of a solar panel of $10m^2$ size with an efficiency of $15\%$ is simulated, using data of global solar radiation in Berlin from June 2021 \footnote{The data was retrieved from \url{https://wetter.htw-berlin.de}.}. The resulting power traces are visualized in Figure \ref{fig:scenario_power}.
+Now, a 48h-experiment is conducted based on a more realistic system configuration that is supposed to represent the power system of a simplified data center to test the models in a more variable environment, while utilizing the enhanced co-simulation capabilities of Vessim \cite{vessim}. In this scenario, there are two nodes, which represent servers in the data center that have a constant power consumption of $200W$ and $50W$ that are aggregated and multiplied by a power usage effectiveness (PUE) of $1.3$ to obtain the total power consumption of the mocked data center. Additionally, the power production of a solar panel of $10m^2$ size with an efficiency of $15\%$ is simulated, using data of global solar radiation in Berlin from June 2021 \footnote{The data was retrieved from \url{https://wetter.htw-berlin.de}}. Figure \ref{fig:scenario_power} presents the resulting power traces.
 
 \begin{figure}[t]
     \centering
@@ -155,9 +158,9 @@ Now, a 48h-experiment is conducted based on a more realistic system configuratio
 
 In the scenario, the co-simulated microgrid is allowed to exchange energy with the public grid at all times, and the included \textbf{MicrogridPolicy} tries to (dis-)charge as much of the power-delta as possible using the \textbf{Storage}, while exchanging the remaining energy delta with the grid. On top, the policy allows a minimum SoC to be set, at which point it stops to further discharge the energy storage, and includes functionality to charge the \textbf{Storage} at a specific power rate using the power-delta and grid-energy.
 
-During all the simulations, a custom controller is used, which sets the minimum SoC to $60\%$ during the day and $30\%$ between 1AM and 12AM using the described \textit{set-parameters}. In the same way, the \textbf{MicrogridPolicy} is instructed to charge the battery pack at $2500W$ between 10AM and 12AM on the second day due to insufficient solar production.
+During all the simulations, a custom controller is used that instructs the \textbf{MicrogridPolicy} to charge the battery pack at $3200W$ between 11AM and 12AM on the second day due to insufficient solar production. The minimum SoC is fixed to $30\%$ at all times to ensure operation of the data center in case of grid outages.
 
-The development of the SoC depending on the model used is captured in Figure \ref{fig:scenario_soc}, and the trends show the discovered characteristics outlined in Section \ref{constant_power_(dis-)charging}. In general, while the \textit{SimpleBattery} fails to accurately represent the SoC of the more complex models, in particular when charging at a high SoC, the \textit{CLCBattery} captures the physical models quite well throughout the experiment. Again, no real differences in the estimation can be seen between the \textit{PybammBattery} and the \textit{LiionBatteryPack}.
+The development of the SoC depending on the model used is represented in Figure \ref{fig:scenario_soc}, and the trends show the discovered characteristics outlined in Section \ref{constant_power_(dis-)charging}. In general, while the \textit{SimpleBattery} fails to accurately represent the SoC of the more complex models, in particular when charging at a high SoC, the \textit{CLCBattery} captures the physical models quite well throughout the experiment. Again, no real differences in the estimation can be seen between the \textit{PybammBattery} and the \textit{LiionBatteryPack}.
 
 \begin{figure}[t]
     \centering
@@ -174,6 +177,8 @@ The development of the SoC depending on the model used is captured in Figure \re
 \end{figure}
 
 When looking at the exchanged energy with the grid (depicted in Figure \ref{fig:scenario_grid_energy}), it is obtained that over the course of the two days, the \textit{LiionBatteryPack} used a net $1103Wh$ of energy from the grid, with the battery having to charge a total amount of $3435Wh$, and having fed back only around $2332Wh$. This net grid charge is $1.9\%$ higher than for the \textit{PybammBattery} ($1081Wh$), $8.5\%$ higher than for the \textit{CLCBattery} ($1016Wh$), and a total of $41.5\%$ higher than for the \textit{SimpleBattery} ($779Wh$) for this particular scenario.
+
+Because the \textit{SimpleBattery} does not consider any inefficiencies, and is parameterized to best reflect the SoC of the more complex models, it charges and discharges completely using less energy so that more energy exchange with the grid is necessary. This is obviously not the case for the \textit{CLCBattery}, hence the good approximation of the physical models. The remaining inaccuracy here comes from over- and underestimations of inefficiencies, and slightly different power limits, meaning that for a good parameterization of the C-L-C model, the difference in exchanged grid energy is likely to balance relative to the used \textit{PybammBattery} over long experiments. When looking at the \textit{PybammBattery} against the \textit{LiionBatteryPack}, it can be determined that for the modeled battery pack, the power losses of the pack's circuit do not make a huge difference in this particular experiment.
 
 \subsection{Runtime Analysis}
 \label{runtime_analysis}
@@ -192,8 +197,12 @@ The complexity of the optimization problem for the \textit{LiionBatteryPack} sca
 
 \section{Discussion}
 \label{discussion}
-Firstly, we can say that the extended Vessim co-simulation architecture with the refined storage simulation unit described in Chapter \ref{integration} seamlessly allows the integration of various battery models. According to the results from the data center scenario, the proposed extension can be used to study energy- and battery management inside isolated power systems like microgrids, and therefore could serve as a co-simulation testbed for data centers.
+Firstly, it can be said that the extended Vessim co-simulation architecture with the refined storage simulation unit described in Chapter \ref{integration} seamlessly allows the integration of various battery models. According to the results from the data center scenario, the proposed extension can be used to study energy- and battery management inside isolated power systems like microgrids, and therefore could serve as a co-simulation testbed for data centers.
 
 When we compare the models, it becomes obvious that for the used cell, the \textit{SimpleBattery} fails to accurately represent the battery's SoC, especially for charging at an almost full state, while also providing inaccurate estimations of exchanged grid energy in a microgrid scenario. This makes it very unsuitable for experiments with the main focus on energy management. However, the \textit{SimpleBattery} still captures the overall trends, which makes it still useful for scenarios that only try to determine broad tendencies like, for instance, the effectiveness of load forecasting. The reason for that is the straightforward parameterization, the fast runtime, and the independence of the used energy storage, as not only batteries can be modeled this way.
 
-Compared to the \textit{SimpleBattery}, the \textit{CLCBattery} has only minimal performance overhead, while accurately computing the battery's state, and providing a solid estimation of used grid energy. It is therefore applicable for most use-cases where a microgrid is simulated. Difficulties of finding a representative parameterization for the utilized battery cells can be solved using product specifications and perhaps tools like PyBaMM \cite{pybammbatteries}.
+Compared to the \textit{SimpleBattery}, the \textit{CLCBattery} has only minimal performance overhead, while being able to estimate a battery's state, and used grid energy well in comparison to physics-based models. The experiments indicate that the C-L-C model with a decent parameterization has the potential to accurately represent a lithium-ion cell's behavior in short-term experiments. It is therefore applicable for most use-cases where a microgrid is simulated. Representative parameterization for the utilized battery cells can be easily found using product specifications or other experimental data, and even tools for battery simulation like PyBaMM \cite{pybammbatteries}.
+
+Even though SPMs are considered to be the simplest electrochemical models, as Section \ref{single_particle_models} outlines, solving such models still comes with a big computational cost. On top, a decent parameterization can only be obtained through real-world experiments, although frameworks like PyBaMM provide them for a few cell types, and there are difficulties in obtaining a useful estimation of the cell's SoC. There is also uncertainty whether an SPM or other electrochemical models actually represent a real battery cell accurately. These types of models are therefore not useful for most short-term scenarios involving co-simulated microgrids, as these representations of power systems possibly bring additional inaccuracies, so that the usage of physics-based models is not justifiable. There exists, however, the opportunity to utilize such electrochemical models in long-term experiments, when aspects like battery degradation in data center scenarios are of interest, as models such as SPMs can be extended with coupled degradation mechanisms as investigated by O'Kane et al. \cite{o2022lithium}.
+
+For the rather small battery packs investigated in this thesis, there does not seem to be a payoff in modeling a whole battery pack instead of a single cell that is scaled up, as the discovered effects of power losses were fairly minimal. Because the parameterization of the \textit{LiionBatteryPack}'s circuit was not modeled after a real battery pack, the results in that regard might not be reliable, however. For a larger battery pack, the execution times become too large, even up to the point where it would be critical for real-time applications, but the stepping of the electrochemical battery cells could potentially run in parallel to solve this runtime issue. All in all, the results of the experiments using the \textit{LiionBatteryPack} have the most uncertainty to them, yet the collected data questions the usefulness of modeling a battery pack in a way that considers electrochemical cells and the pack's circuit.
