@@ -33,19 +33,23 @@
         \vspace{2em}
         \today
 
+
         \normalsize
-        \vspace{30em}
+        \vspace{5em}
         \begin{tabular}{l l}
             First Reviewer: & Prof. Dr. habil. Odej Kao\\
             Second Reviewer: & Prof. Dr. rer. nat. Volker Markl\\
             Supervisor: & Philipp Wiesner
         \end{tabular}
         
+        \vspace{12em}
+        \includegraphics[width=15em]{thesis/Images/Logo_TU.pdf}
+        
         \vspace{1em}
-        Technische Universität Berlin / Technical University of Berlin\\
-        Faculty IV -- Electrical Engineering and Computer Science\\
+        Distributed and Operating Systems\\
         Department of Telecommunication Systems\\
-        Distributed and Operating Systems
+        Faculty IV -- Electrical Engineering and Computer Science\\
+        Technische Universität Berlin / Technical University of Berlin\\
     \end{center}
 \end{titlepage}
 
@@ -59,22 +63,36 @@ Hiermit erkläre ich, dass ich die vorliegende Arbeit selbstständig und eigenh�
 \noindent
 I hereby declare that I have completed this thesis independently, single-handedly and without any disallowed external help. This work was made using exclusively the sources and aids listed.
 
+\selectlanguage{ngerman}
 \vspace{5cm}
 \begin{tabular}{l r}
-     Berlin, \today &  \includegraphics{thesis/Images/Signature.pdf}\\
+     Berlin, den \today &  \includegraphics{thesis/Images/Signature.pdf}\\
      \hline
      & Paul Michael Kilian 
 \end{tabular}
 
-\selectlanguage{ngerman}
+\newgeometry{right=4cm, left=4cm}
 \begin{abstract}
+
+    In Zeiten steigender Nachfrage nach Rechenleistung führt die Forderung für mehr Nachhaltigkeit im Energiebereich zu Veränderungen der Infrastruktur von Rechenzentren hinsichtlich des Stromversorgungssystems, da viele Anbieter für den Betrieb ihrer Rechenanlagen in Microgrid Umgebungen entscheiden. Die Notwendigkeit, Fortschritte bei der Steuerung solch komplexer und dynamischer Systeme zu erzielen, hat zur Entwicklung von Co-Simulations Testumgebungen geführt, die viele domänenspezifische Simulatoren miteinander verbinden, um die Forschung an Interaktionen zwischen Energie- und Rechensystemen voranzutreiben.
+
+    Diese Arbeit stellt eine Erweiterung des kürzlich entwickelten Vessim Frameworks, das als eine solche Testumgebung dient, vor, um die Integration und Verhaltensweisen verschiedener Batteriemodelle in Simulations-Szenarien von Rechenzentren zu ermöglichen. Um die Nützlichkeit der Verwendung spezifischer Modelle für gängige Anwendungsfälle zu ermitteln, führt diese Arbeit eine Analyse durch, bei der vier separate Modelle für Batterie-Pakete mit Lithium-Ionen-Zellen in das Framework eingebettet werden. Darunter sind sowohl einfache Modelle, die keine Verluste oder Grenzwerte berücksichtigen, als auch komplizierte Modelle, die elektrochemische Reaktionen und Ineffizienzen auf Schaltungsebene berücksichtigen.
+
+    Die Ergebnisse der Experimente zeigen, dass lineare Modelle, die Ineffizienzen und Leistungsbegrenzungen in Abhängigkeit vom Zustand der Batterie berücksichtigen, das Verhalten Physik-basierter Modelle in allen Kurzzeitszenarien mit mehr als 400-facher Simulationsgeschwindigkeit recht genau wiedergeben können, was sie zur besten Wahl für die meisten Experimentierzwecke macht. Einfache, verlustfreie Modelle, die den Stromfluss nicht einschränken, sind im Allgemeinen nicht in der Lage, die Leistung komplexer Modelle insbesondere in Randbedingungen angemessen wiederzugeben.
     
 \end{abstract}
 
 \selectlanguage{english}
 \begin{abstract}
+
+    In times of growing demand for computing resources, the call for enhanced energy sustainability sparks changes in the infrastructure of data center's power systems, as many providers are opting for operation of their compute nodes in microgrid environments. The necessity to find advancements in the management of such complex and dynamic systems has lead to the development of co-simulation testbeds, connecting many domain-specific simulators to facilitate research on interactions between power and computing systems.
+
+    This thesis proposes an extension to the recently developed Vessim framework, which serves as such a testbed, to enable the integration and study of various battery models in data center scenarios. To determine the usefulness of utilizing specific models for common use-cases, this work conducts an analysis, implementing four separate models for battery packs with lithium-ion cells in the framework, including both simple models that do not consider any losses or limits and intricate models, accounting for electrochemical reactions and circuit-level dynamics.
+
+    The results of the experiments indicate that linear models, which consider inefficiencies and power limitations depending on the battery's state, can accurately reflect the behavior of physics-based models in all short-term scenarios at over 400 times their simulation speed, making them the best choice for most experimentation purposes. Simple, lossless models not limiting the power-flow generally lack the ability to produce decent representations of the complex models' performance at boundary conditions.
     
 \end{abstract}
+\restoregeometry
 
 \newgeometry{top=3cm}
 \tableofcontents
