@@ -1,3 +1,7 @@
+# This file includes portions of code from the PyBaMM Team, licensed under the MIT License.
+# Original code can be found at: https://github.com/pybamm-team/liionpack
+# Copyright (c) 2021 PyBaMM Team
+
 import numpy as np
 import pandas as pd
 import scipy as sp

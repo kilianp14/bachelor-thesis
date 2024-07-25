@@ -274,6 +274,10 @@ class PybammBattery(vs.Storage):
 
 
 class LiionBatteryPack(vs.Storage):
+    # This class includes portions of code from the PyBaMM Team, licensed under the MIT License.
+    # Original code can be found at: https://github.com/pybamm-team/liionpack
+    # Copyright (c) 2021 PyBaMM Team
+
     def __init__(
         self,
         model_type: type[pybamm.lithium_ion.BaseModel],
@@ -501,6 +505,9 @@ class LiionBatteryPack(vs.Storage):
 
 
 class Actor:
+    # This class includes portions of code from the PyBaMM Team, licensed under the MIT License.
+    # Original code can be found at: https://github.com/pybamm-team/liionpack
+    # Copyright (c) 2021 PyBaMM Team
     def __init__(self):
         pass
 

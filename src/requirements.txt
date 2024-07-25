@@ -1,6 +1,9 @@
+vessim
 lcapy
+plotly
 matplotlib
+casadi
 numpy
 pandas
 scipy
-pybamm==23.9
+pybamm

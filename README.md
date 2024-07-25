@@ -1,1 +1,1 @@
-# bachelor-thesis
+# Bachelor's Thesis: Modeling Energy Storage in Co-Simulation Testbeds for Data Centers
